@@ -1,0 +1,1378 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin-left: 20px;
+}
+.parent_list {
+    list-style-type: '*';
+    padding-left: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+.parent_list li {
+    display: inline;
+    font-size: 12px;
+}
+.node_title {
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.parent_list li+li:before {
+    padding: 8px;
+    color: black;
+    content: "/";
+}
+.member_list {
+    padding-left: 0px;
+    margin-top: 8px;
+    margin-bottom: 0px;
+}
+.member_list li {
+    font-size: 14px;
+    list-style: none;
+}
+.member_list li a {
+    font-weight: bold;
+}
+
+.hierarchy_group {
+    padding-bottom: 20px;
+}
+
+</style>
+</head>
+<div class="hierarchy_group" id="__header__">
+<div> <span class="node_title">Atlas Root</div>
+<ul class="parent_list">
+</ul>
+<ul class="member_list">
+<li><a href="#Brain">Brain</a></li>
+<li>skin</li>
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Brain">
+<div> <span class="node_title">Brain</div>
+<ul class="parent_list">
+</ul>
+<ul class="member_list">
+<li><a href="#midbrain">midbrain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Extraocular_Muscles">
+<div> <span class="node_title">Extraocular Muscles</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left inferior rectus</li>
+<li>left lateral rectus</li>
+<li>left levator palpebrae superioris</li>
+<li>left medial rectus</li>
+<li>left superior oblique</li>
+<li>left superior rectus</li>
+<li>right inferior rectus</li>
+<li>right lateral rectus</li>
+<li>right levator palpebrae superioris</li>
+<li>right medial rectus</li>
+<li>right superior oblique</li>
+<li>right superior rectus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Eyeballs">
+<div> <span class="node_title">Eyeballs</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left eyeball</li>
+<li>right eyeball</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Head_and_Neck_Muscles">
+<div> <span class="node_title">Head and Neck Muscles</div>
+<ul class="parent_list">
+</ul>
+<ul class="member_list">
+<li><a href="#Extraocular_Muscles">Extraocular Muscles</a></li>
+<li><a href="#Eyeballs">Eyeballs</a></li>
+<li><a href="#Muscles_of_Mastication">Muscles of Mastication</a></li>
+<li><a href="#Muscles_of_Pharynx">Muscles of Pharynx</a></li>
+<li><a href="#Muscles_of_Soft_Palate">Muscles of Soft Palate</a></li>
+<li><a href="#Muscles_of_the_Face">Muscles of the Face</a></li>
+<li><a href="#Muscles_of_the_Neck">Muscles of the Neck</a></li>
+<li><a href="#Muscles_of_the_Tongue">Muscles of the Tongue</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Muscles_of_Mastication">
+<div> <span class="node_title">Muscles of Mastication</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left lateral pterygoid</li>
+<li>left masseter</li>
+<li>left medial pterygoid</li>
+<li>left temporalis</li>
+<li>right lateral pterygoid</li>
+<li>right masseter</li>
+<li>right medial pterygoid</li>
+<li>right temporalis</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Muscles_of_Pharynx">
+<div> <span class="node_title">Muscles of Pharynx</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left stylopharyngeus</li>
+<li>middle constrictor</li>
+<li>right stylopharyngeus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Muscles_of_Soft_Palate">
+<div> <span class="node_title">Muscles of Soft Palate</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left levator veli palatini</li>
+<li>left palatoglossus</li>
+<li>left palatopharyngeus</li>
+<li>left tensor veli palatini</li>
+<li>right levator veli palatini</li>
+<li>right palatoglossus</li>
+<li>right palatopharyngeus</li>
+<li>right tensor veli palatini</li>
+<li>uvula</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Muscles_of_the_Face">
+<div> <span class="node_title">Muscles of the Face</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left buccinator</li>
+<li>left levator labii superioris</li>
+<li>left nasalis</li>
+<li>left zygomaticus major</li>
+<li>right buccinator</li>
+<li>right levator labii superioris</li>
+<li>right nasalis</li>
+<li>right zygomaticus major</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Muscles_of_the_Neck">
+<div> <span class="node_title">Muscles of the Neck</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left anterior rectus capitis</li>
+<li>left digastric</li>
+<li>left inferior oblique capitis</li>
+<li>left longissimus capitis</li>
+<li>left longus capitis</li>
+<li>left longus colli</li>
+<li>left middle scalenus</li>
+<li>left rectus capitis posterior major</li>
+<li>left rectus capitis posterior minor</li>
+<li>left semispinalis capitis</li>
+<li>left splenius capitis</li>
+<li>left sternocleidomastoid</li>
+<li>left stylohyoid</li>
+<li>left superior oblique capitis</li>
+<li>left trapezius</li>
+<li>right anterior rectus capitis</li>
+<li>right digastric</li>
+<li>right inferior oblique capitis</li>
+<li>right longissimus capitis</li>
+<li>right longus capitis</li>
+<li>right longus colli</li>
+<li>right middle scalenus</li>
+<li>right rectus capitis posterior major</li>
+<li>right rectus capitis posterior minor</li>
+<li>right semispinalis capitis</li>
+<li>right splenius capitis</li>
+<li>right sternocleidomastoid</li>
+<li>right stylohyoid</li>
+<li>right superior oblique capitis</li>
+<li>right trapezius</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="Muscles_of_the_Tongue">
+<div> <span class="node_title">Muscles of the Tongue</div>
+<ul class="parent_list">
+<li><a href="#Head_and_Neck_Muscles">Head and Neck Muscles</a></li>
+</ul>
+<ul class="member_list">
+<li>left hyoglossus</li>
+<li>right hyoglossus</li>
+<li>tongue</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="cerebellum">
+<div> <span class="node_title">cerebellum</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#left_hemisphere_of_cerebellum">left hemisphere of cerebellum</a></li>
+<li><a href="#right_hemisphere_of_cerebellum">right hemisphere of cerebellum</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="diencephalon">
+<div> <span class="node_title">diencephalon</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#epithalamus">epithalamus</a></li>
+<li><a href="#hypothalamus">hypothalamus</a></li>
+<li>left mammillothalamic tract</li>
+<li>left optic nerve</li>
+<li>left optic tract</li>
+<li>right mammillothalamic tract</li>
+<li>right optic nerve</li>
+<li>right optic tract</li>
+<li><a href="#thalamus">thalamus</a></li>
+<li>third ventricle (#third_ventricle__0)</li>
+<li>third ventricle (#third_ventricle__1)</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="epithalamus">
+<div> <span class="node_title">epithalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li>pineal body</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="hypothalamus">
+<div> <span class="node_title">hypothalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#left_hypothalamus">left hypothalamus</a></li>
+<li>left mammillary body</li>
+<li><a href="#neurohypophysis__1">neurohypophysis</a></li>
+<li>optic chiasm</li>
+<li><a href="#right_hypothalamus">right hypothalamus</a></li>
+<li>right mammillary body</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="lateral_hemispheric_zone_1__0">
+<div> <span class="node_title">lateral hemispheric zone 1</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#right_hemisphere_of_cerebellum">right hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>right-V-l</li>
+<li>right-VI-l</li>
+<li>right-VIIA crusI-l1</li>
+<li>right-VIIA crusII-l1</li>
+<li>right-VIIB-l</li>
+<li>right-VIIIA-l</li>
+<li>right-VIIIB-l</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="lateral_hemispheric_zone_1__1">
+<div> <span class="node_title">lateral hemispheric zone 1</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#left_hemisphere_of_cerebellum">left hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>left-V-l</li>
+<li>left-VI-l</li>
+<li>left-VIIA crusI-l1</li>
+<li>left-VIIA crusII-l1</li>
+<li>left-VIIB-l</li>
+<li>left-VIIIA-l</li>
+<li>left-VIIIB-l</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="lateral_hemispheric_zone_2__0">
+<div> <span class="node_title">lateral hemispheric zone 2</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#right_hemisphere_of_cerebellum">right hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>right-VIIA crusI-l2</li>
+<li>right-VIIA crusII-l2</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="lateral_hemispheric_zone_2__1">
+<div> <span class="node_title">lateral hemispheric zone 2</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#left_hemisphere_of_cerebellum">left hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>left-VIIA crusI-l2</li>
+<li>left-VIIA crusII-l2</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="lateral_nuclear_group__0">
+<div> <span class="node_title">lateral nuclear group</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+<li><a href="#left_thalamus">left thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>left lateral dorsal thalamic nucleus</li>
+<li>left lateral posterior thalamic nucleus</li>
+<li>left pulvinar</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="lateral_nuclear_group__1">
+<div> <span class="node_title">lateral nuclear group</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+<li><a href="#right_thalamus">right thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>right lateral dorsal thalamic nucleus</li>
+<li>right lateral posterior thalamic nucleus</li>
+<li>right pulvinar</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_anterior_cingulate_gyrus">
+<div> <span class="node_title">left anterior cingulate gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#left_limbic_lobe">left limbic lobe</a></li>
+<li><a href="#left_cingulate_gyrus">left cingulate gyrus</a></li>
+</ul>
+<ul class="member_list">
+<li>caudal part of left anterior cingulate gyrus</li>
+<li>rostral part of left anterior cingulate gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_cerebral_hemisphere">
+<div> <span class="node_title">left cerebral hemisphere</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#left_frontal_lobe">left frontal lobe</a></li>
+<li><a href="#left_insula__0">left insula</a></li>
+<li><a href="#left_lateral_ventricle__0">left lateral ventricle</a></li>
+<li><a href="#left_limbic_lobe">left limbic lobe</a></li>
+<li><a href="#left_occipital_lobe">left occipital lobe</a></li>
+<li><a href="#left_parietal_lobe">left parietal lobe</a></li>
+<li><a href="#left_temporal_lobe">left temporal lobe</a></li>
+<li><a href="#subcortex_of_left_cerebral_hemisphere">subcortex of left cerebral hemisphere</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_cingulate_gyrus">
+<div> <span class="node_title">left cingulate gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#left_limbic_lobe">left limbic lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>isthmus of left cingulate gyrus</li>
+<li><a href="#left_anterior_cingulate_gyrus">left anterior cingulate gyrus</a></li>
+<li>left posterior cingulate gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_frontal_lobe">
+<div> <span class="node_title">left frontal lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left central sulcus</li>
+<li>left frontal pole</li>
+<li><a href="#left_inferior_frontal_gyrus">left inferior frontal gyrus</a></li>
+<li>left inferior frontal sulcus</li>
+<li>left lateral orbital gyrus</li>
+<li><a href="#left_middle_frontal_gyrus">left middle frontal gyrus</a></li>
+<li>left paracentral lobule</li>
+<li>left precentral gyrus</li>
+<li>left precentral sulcus</li>
+<li>left straight gyrus</li>
+<li>left superior frontal gyrus</li>
+<li>left superior frontal sulcus</li>
+<li>left superior temporal sulcus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_globus_pallidus">
+<div> <span class="node_title">left globus pallidus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#subcortex_of_left_cerebral_hemisphere">subcortex of left cerebral hemisphere</a></li>
+<li><a href="#left_lentiform_nucleus">left lentiform nucleus</a></li>
+</ul>
+<ul class="member_list">
+<li>left globus pallidus pars externa</li>
+<li>left globus pallidus pars interna</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_hemisphere_of_cerebellum">
+<div> <span class="node_title">left hemisphere of cerebellum</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#lateral_hemispheric_zone_1__1">lateral hemispheric zone 1</a></li>
+<li><a href="#lateral_hemispheric_zone_2__1">lateral hemispheric zone 2</a></li>
+<li>left-Dentate-nucleus</li>
+<li>left-FaGE nuclei</li>
+<li><a href="#medial_hemispheric_zone__0">medial hemispheric zone</a></li>
+<li><a href="#vermis__0">vermis</a></li>
+<li>white matter of left hemisphere of cerebellum</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_hypothalamus">
+<div> <span class="node_title">left hypothalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#hypothalamus">hypothalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>left anterior inferior hypothalamus</li>
+<li>left anterior superior hypothalamus</li>
+<li>left inferior tuberal hypothalamus</li>
+<li>left posterior superior hypothalamus</li>
+<li>left subthalamic nucleus</li>
+<li>left superior tuberal hypothalamus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_inferior_frontal_gyrus">
+<div> <span class="node_title">left inferior frontal gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#left_frontal_lobe">left frontal lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>opercular part of left inferior frontal gyrus</li>
+<li>orbital part of left inferior frontal gyrus</li>
+<li>triangular part of left inferior frontal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_inferior_parietal_lobule__1">
+<div> <span class="node_title">left inferior parietal lobule</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#left_parietal_lobe">left parietal lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>left inferior parietal lobule (#left_inferior_parietal_lobule__0)</li>
+<li>left supramarginal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_insula__0">
+<div> <span class="node_title">left insula</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left insula (#left_insula__1)</li>
+<li>left limen insulae</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_lateral_ventricle__0">
+<div> <span class="node_title">left lateral ventricle</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left lateral ventricle (#left_lateral_ventricle__1)</li>
+<li>temporal horn of left lateral ventricle</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_lentiform_nucleus">
+<div> <span class="node_title">left lentiform nucleus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#subcortex_of_left_cerebral_hemisphere">subcortex of left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#left_globus_pallidus">left globus pallidus</a></li>
+<li>left putamen</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_limbic_lobe">
+<div> <span class="node_title">left limbic lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left amygdala</li>
+<li><a href="#left_cingulate_gyrus">left cingulate gyrus</a></li>
+<li>left cingulate sulcus</li>
+<li>left hippocampus</li>
+<li>left parahippocampal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_metathalamus">
+<div> <span class="node_title">left metathalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>left lateral geniculate body</li>
+<li>left medial geniculate body</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_middle_frontal_gyrus">
+<div> <span class="node_title">left middle frontal gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#left_frontal_lobe">left frontal lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>anterior part of left middle frontal gyrus</li>
+<li>posterior part of left middle frontal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_occipital_lobe">
+<div> <span class="node_title">left occipital lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left calcarine sulcus</li>
+<li>left cuneus</li>
+<li>left lateral occipital gyrus</li>
+<li>left lingual gyrus</li>
+<li>left parieto-occipital sulcus</li>
+<li>left visual cortex</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_parietal_lobe">
+<div> <span class="node_title">left parietal lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#left_inferior_parietal_lobule__1">left inferior parietal lobule</a></li>
+<li>left intraparietal sulcus</li>
+<li>left postcentral gyrus</li>
+<li>left postcentral sulcus</li>
+<li>left precuneus</li>
+<li>left superior parietal lobule</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_side_of_midbrain">
+<div> <span class="node_title">left side of midbrain</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#midbrain">midbrain</a></li>
+</ul>
+<ul class="member_list">
+<li>brachia of left inferior colliculus</li>
+<li>brachia of left superior colliculus</li>
+<li>left inferior colliculus (#left_inferior_colliculus__1)</li>
+<li>left inferior colliculus (#left_inferior_colliculus__0)</li>
+<li>left red nucleus</li>
+<li>left substantia nigra</li>
+<li>left superior colliculus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_temporal_lobe">
+<div> <span class="node_title">left temporal lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left ambiens gyrus</li>
+<li>left claustrum</li>
+<li>left collateral sulcus</li>
+<li>left fusiform gyrus</li>
+<li>left inferior temporal gyrus</li>
+<li>left middle temporal gyrus</li>
+<li>left superior temporal gyrus</li>
+<li>left superior temporal gyrus (banks of left superior temporal sulcus) (#left_superior_temporal_gyrus_%28banks_of_left_superior_temporal_sulcus%29)</li>
+<li>left temporal pole</li>
+<li>left transverse temporal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="left_thalamus">
+<div> <span class="node_title">left thalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#lateral_nuclear_group__0">lateral nuclear group</a></li>
+<li>left anterior thalamic nucleus</li>
+<li>left centromedian thalamic nucleus</li>
+<li>left dorsomedial thalamic nucleus</li>
+<li>left internal medullary lamina</li>
+<li><a href="#ventral_nuclear_group__0">ventral nuclear group</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="medial_hemispheric_zone__0">
+<div> <span class="node_title">medial hemispheric zone</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#left_hemisphere_of_cerebellum">left hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>left-III-m</li>
+<li>left-IV-m</li>
+<li>left-IX-m</li>
+<li>left-V-m</li>
+<li>left-VI-m</li>
+<li>left-VIIA crusI-m</li>
+<li>left-VIIA crusII-m</li>
+<li>left-VIIB-m</li>
+<li>left-VIIIA-m</li>
+<li>left-VIIIB-m</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="medial_hemispheric_zone__1">
+<div> <span class="node_title">medial hemispheric zone</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#right_hemisphere_of_cerebellum">right hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>right-III-m</li>
+<li>right-IV-m</li>
+<li>right-IX-m</li>
+<li>right-V-m</li>
+<li>right-VI-m</li>
+<li>right-VIIA crusI-m</li>
+<li>right-VIIA crusII-m</li>
+<li>right-VIIB-m</li>
+<li>right-VIIIA-m</li>
+<li>right-VIIIB-m</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="metencephalon">
+<div> <span class="node_title">metencephalon</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#cerebellum">cerebellum</a></li>
+<li>pons</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="midbrain">
+<div> <span class="node_title">midbrain</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+</ul>
+<ul class="member_list">
+<li>aqueduct</li>
+<li><a href="#left_side_of_midbrain">left side of midbrain</a></li>
+<li>part of midbrain</li>
+<li><a href="#right_side_of_midbrain">right side of midbrain</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="neurohypophysis__1">
+<div> <span class="node_title">neurohypophysis</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#hypothalamus">hypothalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>adenohypophysis</li>
+<li>infundibulum of neurohypophysis</li>
+<li>neurohypophysis (#neurohypophysis__0)</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="prosencephalon">
+<div> <span class="node_title">prosencephalon</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="rhombencephalon">
+<div> <span class="node_title">rhombencephalon</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+</ul>
+<ul class="member_list">
+<li>fourth ventricle</li>
+<li>medulla oblongata</li>
+<li><a href="#metencephalon">metencephalon</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_anterior_cingulate_gyrus">
+<div> <span class="node_title">right anterior cingulate gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#right_limbic_lobe">right limbic lobe</a></li>
+<li><a href="#right_cingulate_gyrus">right cingulate gyrus</a></li>
+</ul>
+<ul class="member_list">
+<li>caudal part of right anterior cingulate gyrus</li>
+<li>rostral part of right anterior cingulate gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_cerebral_hemisphere">
+<div> <span class="node_title">right cerebral hemisphere</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li>right claustrum</li>
+<li><a href="#right_frontal_lobe">right frontal lobe</a></li>
+<li><a href="#right_insula__0">right insula</a></li>
+<li><a href="#right_lateral_ventricle__1">right lateral ventricle</a></li>
+<li><a href="#right_limbic_lobe">right limbic lobe</a></li>
+<li><a href="#right_occipital_lobe">right occipital lobe</a></li>
+<li><a href="#right_parietal_lobe">right parietal lobe</a></li>
+<li><a href="#right_temporal_lobe">right temporal lobe</a></li>
+<li><a href="#subcortex_of_right_cerebral_hemisphere">subcortex of right cerebral hemisphere</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_cingulate_gyrus">
+<div> <span class="node_title">right cingulate gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#right_limbic_lobe">right limbic lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>isthmus of right cingulate gyrus</li>
+<li><a href="#right_anterior_cingulate_gyrus">right anterior cingulate gyrus</a></li>
+<li>right posterior cingulate gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_frontal_lobe">
+<div> <span class="node_title">right frontal lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right central sulcus</li>
+<li>right frontal pole</li>
+<li><a href="#right_inferior_frontal_gyrus">right inferior frontal gyrus</a></li>
+<li>right inferior frontal sulcus</li>
+<li>right lateral orbital gyrus</li>
+<li><a href="#right_middle_frontal_gyrus">right middle frontal gyrus</a></li>
+<li>right paracentral lobule</li>
+<li>right precentral gyrus</li>
+<li>right precentral sulcus</li>
+<li>right straight gyrus</li>
+<li>right superior frontal gyrus</li>
+<li>right superior frontal sulcus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_globus_pallidus">
+<div> <span class="node_title">right globus pallidus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#subcortex_of_right_cerebral_hemisphere">subcortex of right cerebral hemisphere</a></li>
+<li><a href="#right_lentiform_nucleus">right lentiform nucleus</a></li>
+</ul>
+<ul class="member_list">
+<li>right globus pallidus pars externa</li>
+<li>right globus pallidus pars interna</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_hemisphere_of_cerebellum">
+<div> <span class="node_title">right hemisphere of cerebellum</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#lateral_hemispheric_zone_1__0">lateral hemispheric zone 1</a></li>
+<li><a href="#lateral_hemispheric_zone_2__0">lateral hemispheric zone 2</a></li>
+<li><a href="#medial_hemispheric_zone__1">medial hemispheric zone</a></li>
+<li>right-Dentate-nucleus</li>
+<li>right-FaGE nuclei</li>
+<li><a href="#vermis__1">vermis</a></li>
+<li>white matter of right hemisphere of cerebellum</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_hypothalamus">
+<div> <span class="node_title">right hypothalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#hypothalamus">hypothalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>right anterior inferior hypothalamus</li>
+<li>right anterior superior hypothalamus</li>
+<li>right inferior tuberal hypothalamus</li>
+<li>right posterior superior hypothalamus</li>
+<li>right subthalamic nucleus</li>
+<li>right superior tuberal hypothalamus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_inferior_frontal_gyrus">
+<div> <span class="node_title">right inferior frontal gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#right_frontal_lobe">right frontal lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>opercular part of right inferior frontal gyrus</li>
+<li>orbital part of right inferior frontal gyrus</li>
+<li>triangular part of right inferior frontal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_inferior_parietal_lobule__0">
+<div> <span class="node_title">right inferior parietal lobule</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#right_parietal_lobe">right parietal lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>right inferior parietal lobule (#right_inferior_parietal_lobule__1)</li>
+<li>right supramarginal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_insula__0">
+<div> <span class="node_title">right insula</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right insula (#right_insula__1)</li>
+<li>right limen insulae</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_lateral_ventricle__1">
+<div> <span class="node_title">right lateral ventricle</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right lateral ventricle (#right_lateral_ventricle__0)</li>
+<li>temporal horn of right lateral ventricle</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_lentiform_nucleus">
+<div> <span class="node_title">right lentiform nucleus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#subcortex_of_right_cerebral_hemisphere">subcortex of right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#right_globus_pallidus">right globus pallidus</a></li>
+<li>right putamen</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_limbic_lobe">
+<div> <span class="node_title">right limbic lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right amygdala</li>
+<li><a href="#right_cingulate_gyrus">right cingulate gyrus</a></li>
+<li>right cingulate sulcus</li>
+<li>right hippocampus</li>
+<li>right parahippocampal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_metathalamus">
+<div> <span class="node_title">right metathalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>right lateral geniculate body</li>
+<li>right medial geniculate body</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_middle_frontal_gyrus">
+<div> <span class="node_title">right middle frontal gyrus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#right_frontal_lobe">right frontal lobe</a></li>
+</ul>
+<ul class="member_list">
+<li>anterior part of right middle frontal gyrus</li>
+<li>posterior part of right middle frontal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_occipital_lobe">
+<div> <span class="node_title">right occipital lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right calcarine sulcus</li>
+<li>right cuneus</li>
+<li>right lateral occipital gyrus</li>
+<li>right lingual gyrus</li>
+<li>right parieto-occipital sulcus</li>
+<li>right visual cortex</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_parietal_lobe">
+<div> <span class="node_title">right parietal lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#right_inferior_parietal_lobule__0">right inferior parietal lobule</a></li>
+<li>right intraparietal sulcus</li>
+<li>right postcentral gyrus</li>
+<li>right postcentral sulcus</li>
+<li>right precuneus</li>
+<li>right superior parietal lobule</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_side_of_midbrain">
+<div> <span class="node_title">right side of midbrain</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#midbrain">midbrain</a></li>
+</ul>
+<ul class="member_list">
+<li>brachia of right inferior colliculus</li>
+<li>brachia of right superior colliculus (#brachia_of_right_superior_colliculus__0)</li>
+<li>brachia of right superior colliculus (#brachia_of_right_superior_colliculus__1)</li>
+<li>right inferior colliculus</li>
+<li>right red nucleus</li>
+<li>right substantia nigra</li>
+<li>right superior colliculus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_temporal_lobe">
+<div> <span class="node_title">right temporal lobe</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right ambiens gyrus</li>
+<li>right collateral sulcus</li>
+<li>right fusiform gyrus</li>
+<li>right inferior temporal gyrus</li>
+<li>right middle temporal gyrus</li>
+<li>right superior temporal gyrus</li>
+<li>right superior temporal gyrus (banks of right superior temporal sulcus) (#right_superior_temporal_gyrus_%28banks_of_right_superior_temporal_sulcus%29)</li>
+<li>right superior temporal sulcus</li>
+<li>right temporal pole</li>
+<li>right transverse temporal gyrus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="right_thalamus">
+<div> <span class="node_title">right thalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#lateral_nuclear_group__1">lateral nuclear group</a></li>
+<li>right anterior thalamic nucleus</li>
+<li>right centromedian thalamic nucleus</li>
+<li>right dorsomedial thalamic nucleus</li>
+<li>right internal medullary lamina</li>
+<li><a href="#ventral_nuclear_group__1">ventral nuclear group</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="septum_of_telencephalon">
+<div> <span class="node_title">septum of telencephalon</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li>pellucid septum</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="striatum_of_left_cerebral_hemisphere">
+<div> <span class="node_title">striatum of left cerebral hemisphere</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#subcortex_of_left_cerebral_hemisphere">subcortex of left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left caudate nucleus</li>
+<li>left nucleus accumbens</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="striatum_of_right_cerebral_hemisphere">
+<div> <span class="node_title">striatum of right cerebral hemisphere</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#subcortex_of_right_cerebral_hemisphere">subcortex of right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right caudate nucleus</li>
+<li>right nucleus accumbens</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="subcortex_of_left_cerebral_hemisphere">
+<div> <span class="node_title">subcortex of left cerebral hemisphere</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>left fornix of forebrain</li>
+<li><a href="#left_lentiform_nucleus">left lentiform nucleus</a></li>
+<li><a href="#striatum_of_left_cerebral_hemisphere">striatum of left cerebral hemisphere</a></li>
+<li>white matter of left cerebral hemisphere</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="subcortex_of_right_cerebral_hemisphere">
+<div> <span class="node_title">subcortex of right cerebral hemisphere</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#telencephalon">telencephalon</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+</ul>
+<ul class="member_list">
+<li>right fornix of forebrain</li>
+<li><a href="#right_lentiform_nucleus">right lentiform nucleus</a></li>
+<li><a href="#striatum_of_right_cerebral_hemisphere">striatum of right cerebral hemisphere</a></li>
+<li>white matter of right cerebral hemisphere</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="telencephalon">
+<div> <span class="node_title">telencephalon</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li>anterior commissure</li>
+<li>corpus callosum</li>
+<li><a href="#left_cerebral_hemisphere">left cerebral hemisphere</a></li>
+<li><a href="#right_cerebral_hemisphere">right cerebral hemisphere</a></li>
+<li><a href="#septum_of_telencephalon">septum of telencephalon</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="thalamus">
+<div> <span class="node_title">thalamus</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+</ul>
+<ul class="member_list">
+<li><a href="#left_metathalamus">left metathalamus</a></li>
+<li><a href="#left_thalamus">left thalamus</a></li>
+<li><a href="#right_metathalamus">right metathalamus</a></li>
+<li><a href="#right_thalamus">right thalamus</a></li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="ventral_nuclear_group__0">
+<div> <span class="node_title">ventral nuclear group</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+<li><a href="#left_thalamus">left thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>left ventral anterior thalamic nucleus</li>
+<li>left ventral lateral thalamic nucleus</li>
+<li>left ventral posterolateral thalamic nucleus</li>
+<li>left ventral posteromedial thalamic nucleus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="ventral_nuclear_group__1">
+<div> <span class="node_title">ventral nuclear group</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#prosencephalon">prosencephalon</a></li>
+<li><a href="#diencephalon">diencephalon</a></li>
+<li><a href="#thalamus">thalamus</a></li>
+<li><a href="#right_thalamus">right thalamus</a></li>
+</ul>
+<ul class="member_list">
+<li>right ventral anterior thalamic nucleus</li>
+<li>right ventral lateral thalamic nucleus</li>
+<li>right ventral posterolateral thalamic nucleus</li>
+<li>right ventral posteromedial thalamic nucleus</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="vermis__0">
+<div> <span class="node_title">vermis</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#left_hemisphere_of_cerebellum">left hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>left-I II-v</li>
+<li>left-III-v</li>
+<li>left-IV-v</li>
+<li>left-IX-v</li>
+<li>left-V-v</li>
+<li>left-VI-v</li>
+<li>left-VIIB-v</li>
+<li>left-VIIIA-v</li>
+<li>left-VIIIB-v</li>
+<li>left-X-v</li>
+</ul>
+</div>
+
+<div class="hierarchy_group" id="vermis__1">
+<div> <span class="node_title">vermis</div>
+<ul class="parent_list">
+<li><a href="#Brain">Brain</a></li>
+<li><a href="#rhombencephalon">rhombencephalon</a></li>
+<li><a href="#metencephalon">metencephalon</a></li>
+<li><a href="#cerebellum">cerebellum</a></li>
+<li><a href="#right_hemisphere_of_cerebellum">right hemisphere of cerebellum</a></li>
+</ul>
+<ul class="member_list">
+<li>right-I II-v</li>
+<li>right-III-v</li>
+<li>right-IV-v</li>
+<li>right-IX-v</li>
+<li>right-V-v</li>
+<li>right-VI-v</li>
+<li>right-VIIB-v</li>
+<li>right-VIIIA-v</li>
+<li>right-VIIIB-v</li>
+<li>right-X-v</li>
+</ul>
+</div>
+
+</body></html>
