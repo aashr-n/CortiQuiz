@@ -30,3 +30,5 @@ As you drag, the model is dynamically cut away in real-time, revealing cross-sec
 Data & Assets
 The brain atlas data includes a hierarchical JSON file that defines every structure's name, type, group membership, and associated 3D model file. The app loads this at startup and uses it to drive all three modes.
 
+Design
+The app should be simple and intuitive. Worth of an apple design award.
