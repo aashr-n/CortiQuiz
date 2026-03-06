@@ -12,6 +12,7 @@ final class ExploreViewModel {
     var searchQuery = ""
     var explodeFactor: Float = 0
     var isLoading = true
+    var recenterTrigger = false
     
     private var structureNodes: [String: SCNNode] = [:]
     private var originalPositions: [String: SCNVector3] = [:]
@@ -126,6 +127,10 @@ final class ExploreViewModel {
         }
         for child in node.childNodes { applyColor(to: child, color: color) }
     }
+    
+    func resetForReentry() {
+        setupStarted = false
+    }
 }
 
 // MARK: - Explore View
@@ -147,14 +152,28 @@ struct ExploreView: View {
                 }
             } else {
                 // 3D View
-                SceneKitView(scene: vm.scene, onTap: { hit in
-                    if let name = hit.node.name {
-                        vm.selectByID(name)
-                    } else if let parent = hit.node.parent?.name {
-                        vm.selectByID(parent)
+                ZStack(alignment: .bottomTrailing) {
+                    SceneKitView(scene: vm.scene, onTap: { hit in
+                        if let name = hit.node.name {
+                            vm.selectByID(name)
+                        } else if let parent = hit.node.parent?.name {
+                            vm.selectByID(parent)
+                        }
+                    }, recenterTrigger: vm.recenterTrigger)
+                    .ignoresSafeArea(edges: .bottom)
+                    
+                    Button {
+                        vm.recenterTrigger.toggle()
+                    } label: {
+                        Image(systemName: "scope")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
                     }
-                })
-                .ignoresSafeArea(edges: .bottom)
+                    .padding(12)
+                }
                 
                 // Overlays
                 VStack {
@@ -264,5 +283,6 @@ struct ExploreView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { vm.setup() }
+        .onDisappear { vm.resetForReentry() }
     }
 }

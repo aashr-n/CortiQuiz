@@ -16,6 +16,7 @@ final class QuizViewModel {
     var showingFeedback = false
     var scene = SCNScene()
     var isLoading = true
+    var recenterTrigger = false
     private var setupStarted = false
     
     func setup() {
@@ -127,6 +128,10 @@ final class QuizViewModel {
         }
         for child in node.childNodes { applyColor(to: child, color: color) }
     }
+    
+    func resetForReentry() {
+        setupStarted = false
+    }
 }
 
 // MARK: - Quiz View
@@ -164,8 +169,22 @@ struct QuizView: View {
                 .padding(.vertical, 8)
                 
                 // 3D View
-                SceneKitView(scene: vm.scene)
-                    .frame(maxHeight: .infinity)
+                ZStack(alignment: .bottomTrailing) {
+                    SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
+                        .frame(maxHeight: .infinity)
+                    
+                    Button {
+                        vm.recenterTrigger.toggle()
+                    } label: {
+                        Image(systemName: "scope")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                    .padding(12)
+                }
                 
                 // Question area
                 VStack(spacing: 12) {
@@ -225,6 +244,7 @@ struct QuizView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { vm.setup() }
+        .onDisappear { vm.resetForReentry() }
     }
     
     private func optionBackground(_ option: String) -> Color {

@@ -5,22 +5,28 @@ struct SceneKitView: UIViewRepresentable {
     let scene: SCNScene
     var allowsCameraControl: Bool = true
     var onTap: ((SCNHitTestResult) -> Void)? = nil
+    var recenterTrigger: Bool = false  // Toggle to trigger recenter
     
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         view.autoenablesDefaultLighting = false
         view.backgroundColor = .black
         view.antialiasingMode = .multisampling4X
+        view.allowsCameraControl = allowsCameraControl
         
-        // Tap gesture
+        // Enable two-finger pan via orbit turntable mode
+        // Set worldUp to Z to match RAS coordinate brain orientation
+        view.defaultCameraController.interactionMode = .orbitArcball
+        view.defaultCameraController.worldUp = SCNVector3(0, 0, 1)
+        
         if onTap != nil {
             let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
             view.addGestureRecognizer(tap)
         }
         
         view.scene = scene
-        view.allowsCameraControl = allowsCameraControl
         Self.ensureSceneSetup(scene)
+        context.coordinator.lastRecenter = recenterTrigger
         return view
     }
     
@@ -30,20 +36,28 @@ struct SceneKitView: UIViewRepresentable {
             Self.ensureSceneSetup(scene)
         }
         view.allowsCameraControl = allowsCameraControl
+        
+        // Recenter when trigger toggles
+        if recenterTrigger != context.coordinator.lastRecenter {
+            context.coordinator.lastRecenter = recenterTrigger
+            recenterCamera(in: view)
+        }
     }
     
-    /// Adds camera + lights to the scene if not already present.
+    /// Camera facing anterior (along -Y) with superior (Z) as up.
+    /// This orients the brain right-side-up for RAS coordinate models.
     private static func ensureSceneSetup(_ scene: SCNScene) {
         guard scene.rootNode.childNode(withName: "mainCamera", recursively: false) == nil else { return }
         
-        // Camera
         let camera = SCNCamera()
         camera.fieldOfView = 40
         camera.zNear = 1
         camera.zFar = 2000
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0, 300)
+        // Look from front (anterior = -Y in RAS) with superior (Z) as up
+        cameraNode.position = SCNVector3(0, -300, 10)
+        cameraNode.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         cameraNode.name = "mainCamera"
         scene.rootNode.addChildNode(cameraNode)
         
@@ -71,12 +85,22 @@ struct SceneKitView: UIViewRepresentable {
         scene.rootNode.addChildNode(directional2)
     }
     
+    private func recenterCamera(in view: SCNView) {
+        guard let camera = view.scene?.rootNode.childNode(withName: "mainCamera", recursively: true) else { return }
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.5
+        camera.position = SCNVector3(0, -300, 10)
+        camera.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
+        SCNTransaction.commit()
+    }
+    
     func makeCoordinator() -> Coordinator {
         Coordinator(onTap: onTap)
     }
     
     class Coordinator: NSObject {
         let onTap: ((SCNHitTestResult) -> Void)?
+        var lastRecenter: Bool = false
         init(onTap: ((SCNHitTestResult) -> Void)?) { self.onTap = onTap }
         
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -106,8 +130,8 @@ extension SCNView {
         if let camera = scene?.rootNode.childNode(withName: "mainCamera", recursively: true) {
             SCNTransaction.begin()
             SCNTransaction.animationDuration = duration
-            camera.position = SCNVector3(center.x, center.y, center.z + distance)
-            camera.look(at: center)
+            camera.position = SCNVector3(center.x, center.y - distance, center.z)
+            camera.look(at: center, up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
             SCNTransaction.commit()
         }
     }

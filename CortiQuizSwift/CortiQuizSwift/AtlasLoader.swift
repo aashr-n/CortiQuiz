@@ -84,7 +84,7 @@ nonisolated final class ModelCache: @unchecked Sendable {
     
     func node(for fileName: String) -> SCNNode? {
         if let cached = queue.sync(execute: { cache[fileName] }) {
-            return cached.clone()
+            return Self.deepClone(cached)
         }
         
         guard let url = Bundle.main.url(forResource: fileName.replacingOccurrences(of: ".obj", with: ""),
@@ -99,6 +99,20 @@ nonisolated final class ModelCache: @unchecked Sendable {
         node.name = fileName
         
         queue.sync { cache[fileName] = node }
-        return node.clone()
+        return Self.deepClone(node)
+    }
+    
+    /// Deep clone: copies geometry + materials so mutations don't bleed across modes
+    private static func deepClone(_ node: SCNNode) -> SCNNode {
+        let clone = node.clone()
+        if let geom = clone.geometry {
+            clone.geometry = geom.copy() as? SCNGeometry
+            clone.geometry?.materials = geom.materials.map { $0.copy() as! SCNMaterial }
+        }
+        for (i, child) in clone.childNodes.enumerated() {
+            let deepChild = deepClone(child)
+            clone.replaceChildNode(child, with: deepChild)
+        }
+        return clone
     }
 }

@@ -5,15 +5,30 @@ import SceneKit
 
 @MainActor @Observable
 final class MRIViewModel {
-    var scene = SCNScene()
     var slicePosition: Float = 0.5
     var isLoading = true
-    private var whiteNodes: [SCNNode] = []
+    var sliceImage: UIImage?
     
-    // Y-axis bounds of the loaded models
-    private var minY: Float = 0
-    private var maxY: Float = 0
+    private var allNodes: [SCNNode] = []
+    private var nodeColors: [UIColor] = []  // 4-color assignment per node
+    // Z-axis bounds (superior-inferior in RAS)
+    private var minZ: Float = 0
+    private var maxZ: Float = 0
     private var setupStarted = false
+    
+    private var renderer: SCNRenderer?
+    private var mriScene: SCNScene?
+    
+    // Camera Z position — must match setupRenderer
+    nonisolated static let cameraZ: Float = 300
+    
+    // 4 distinct MRI-palette colors (four color theorem)
+    nonisolated static let regionColors: [UIColor] = [
+        UIColor(red: 0.95, green: 0.85, blue: 0.55, alpha: 1.0),  // warm cream
+        UIColor(red: 0.60, green: 0.75, blue: 0.90, alpha: 1.0),  // soft blue
+        UIColor(red: 0.85, green: 0.55, blue: 0.65, alpha: 1.0),  // muted rose
+        UIColor(red: 0.55, green: 0.80, blue: 0.65, alpha: 1.0),  // sage green
+    ]
     
     func setup() {
         guard !setupStarted else { return }
@@ -22,65 +37,113 @@ final class MRIViewModel {
         
         Task.detached { [weak self] in
             let newScene = SCNScene()
-            let files = ["Model_2_white_matter_of_left_cerebral_hemisphere.obj",
-                         "Model_41_white_matter_of_right_cerebral_hemisphere.obj"]
+            let structures = AtlasLoader.load()
+            let brainStructures = structures.filter { $0.modelFileName != nil && $0.isBrainStructure && !$0.isGroup }
             
             var nodes: [SCNNode] = []
-            var globalMinY: Float = .greatestFiniteMagnitude
-            var globalMaxY: Float = -.greatestFiniteMagnitude
+            var colors: [UIColor] = []
+            var globalMinZ: Float = .greatestFiniteMagnitude
+            var globalMaxZ: Float = -.greatestFiniteMagnitude
             
-            for f in files {
-                guard let node = ModelCache.shared.node(for: f) else { continue }
-                let color = UIColor(white: 0.85, alpha: 1.0)
+            for (i, s) in brainStructures.enumerated() {
+                guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
+                let color = Self.regionColors[i % Self.regionColors.count]
                 Self.applyMaterial(to: node, color: color)
                 newScene.rootNode.addChildNode(node)
                 nodes.append(node)
+                colors.append(color)
                 
                 let (bmin, bmax) = node.boundingBox
-                globalMinY = min(globalMinY, bmin.y)
-                globalMaxY = max(globalMaxY, bmax.y)
+                globalMinZ = min(globalMinZ, bmin.z)
+                globalMaxZ = max(globalMaxZ, bmax.z)
             }
             
             let finalNodes = nodes
-            let finalMinY = globalMinY
-            let finalMaxY = globalMaxY
+            let finalColors = colors
+            let finalMinZ = globalMinZ
+            let finalMaxZ = globalMaxZ
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                self.scene = newScene
-                self.whiteNodes = finalNodes
-                self.minY = finalMinY
-                self.maxY = finalMaxY
+                self.mriScene = newScene
+                self.allNodes = finalNodes
+                self.nodeColors = finalColors
+                self.minZ = finalMinZ
+                self.maxZ = finalMaxZ
+                self.setupRenderer()
                 self.isLoading = false
-                self.updateClip()
+                self.updateSlice()
             }
         }
     }
     
-    func updateClip() {
-        let clipY = minY + (maxY - minY) * slicePosition
-        let thickness: Float = 2.0
-        for node in whiteNodes {
-            applyShader(to: node, clipY: clipY, thickness: thickness)
-        }
+    private func setupRenderer() {
+        guard let scene = mriScene else { return }
+        
+        let camera = SCNCamera()
+        camera.usesOrthographicProjection = true
+        camera.orthographicScale = 90
+        camera.zNear = 1
+        camera.zFar = 2000
+        let camNode = SCNNode()
+        camNode.camera = camera
+        camNode.position = SCNVector3(0, 0, Self.cameraZ)
+        camNode.look(at: SCNVector3(0, 0, 0), up: SCNVector3(0, -1, 0), localFront: SCNVector3(0, 0, -1))
+        camNode.name = "mriCamera"
+        scene.rootNode.addChildNode(camNode)
+        
+        let ambient = SCNNode()
+        ambient.light = SCNLight()
+        ambient.light?.type = .ambient
+        ambient.light?.intensity = 1000
+        ambient.light?.color = UIColor.white
+        scene.rootNode.addChildNode(ambient)
+        
+        let r = SCNRenderer(device: nil, options: nil)
+        r.scene = scene
+        r.pointOfView = camNode
+        self.renderer = r
     }
     
-    private func applyShader(to node: SCNNode, clipY: Float, thickness: Float) {
+    func updateSlice() {
+        let clipZ = minZ + (maxZ - minZ) * slicePosition
+        let thickness: Float = 2.0
+        // Convert world-space Z to view-space Z (camera at +cameraZ looking toward origin)
+        let viewClipZ = clipZ - Self.cameraZ
+        for (i, node) in allNodes.enumerated() {
+            applyClipShader(to: node, viewClipZ: viewClipZ, thickness: thickness, color: nodeColors[i])
+        }
+        renderSnapshot()
+    }
+    
+    private func renderSnapshot() {
+        guard let renderer else { return }
+        let size = CGSize(width: 512, height: 512)
+        let image = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
+        self.sliceImage = image
+    }
+    
+    private func applyClipShader(to node: SCNNode, viewClipZ: Float, thickness: Float, color: UIColor) {
         if let geom = node.geometry {
             for mat in geom.materials {
                 mat.shaderModifiers = [
                     .fragment: """
-                    float worldY = _surface.position.y;
-                    if (worldY > \(clipY) || worldY < \(clipY - thickness)) {
+                    float vz = _surface.position.z;
+                    if (vz > \(viewClipZ) || vz < \(viewClipZ - thickness)) {
                         discard_fragment();
                     }
                     """
                 ]
                 mat.isDoubleSided = true
+                mat.diffuse.contents = color
             }
         }
         for child in node.childNodes {
-            applyShader(to: child, clipY: clipY, thickness: thickness)
+            applyClipShader(to: child, viewClipZ: viewClipZ, thickness: thickness, color: color)
         }
+    }
+    
+    func resetForReentry() {
+        setupStarted = false
     }
     
     private nonisolated static func applyMaterial(to node: SCNNode, color: UIColor) {
@@ -112,55 +175,63 @@ struct MRIView: View {
                         .foregroundColor(.gray)
                 }
             } else {
-                HStack(spacing: 0) {
-                    // 3D view
-                    SceneKitView(scene: vm.scene)
-                        .frame(maxWidth: .infinity)
+                VStack(spacing: 0) {
+                    Text("Axial MRI Slice")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(.top, 8)
                     
-                    // Vertical slider
-                    VStack {
-                        Text("S")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
+                    ZStack {
+                        Color(white: 0.05)
                         
-                        GeometryReader { geo in
-                            ZStack(alignment: .bottom) {
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color.white.opacity(0.15))
-                                    .frame(width: 6)
-                                
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(hex: "10b981"))
-                                    .frame(width: 6, height: geo.size.height * CGFloat(vm.slicePosition))
-                                
-                                Circle()
-                                    .fill(Color(hex: "10b981"))
-                                    .frame(width: 24, height: 24)
-                                    .shadow(color: Color(hex: "10b981").opacity(0.5), radius: 6)
-                                    .offset(y: -geo.size.height * CGFloat(vm.slicePosition) + 12)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .gesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { val in
-                                        let pct = 1.0 - (val.location.y / geo.size.height)
-                                        vm.slicePosition = Float(max(0, min(1, pct)))
-                                        vm.updateClip()
-                                    }
-                            )
+                        if let img = vm.sliceImage {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFit()
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .padding(8)
                         }
-                        
-                        Text("I")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
                     }
-                    .frame(width: 44)
-                    .padding(.vertical)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                    
+                    Spacer().frame(height: 12)
+                    
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text("Inferior")
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Text("Position: \(Int(vm.slicePosition * 100))%")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                            Spacer()
+                            Text("Superior")
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 4)
+                        
+                        Slider(value: Binding(
+                            get: { vm.slicePosition },
+                            set: { vm.slicePosition = $0; vm.updateSlice() }
+                        ), in: 0...1)
+                        .tint(Color(hex: "10b981"))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
                 }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .onAppear { vm.setup() }
+        .onDisappear { vm.resetForReentry() }
     }
 }

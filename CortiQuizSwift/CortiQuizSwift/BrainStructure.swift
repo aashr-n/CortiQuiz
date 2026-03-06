@@ -91,6 +91,14 @@ nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
         return true
     }
     
+    /// Only cortical structures for quiz mode
+    var isCorticalStructure: Bool {
+        let n = name.lowercased()
+        let cortexKeywords = ["gyrus", "sulcus", "pole", "lobule", "cuneus", "precuneus",
+                              "insula", "limen", "opercul", "visual cortex"]
+        return cortexKeywords.contains { n.contains($0) }
+    }
+    
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: BrainStructure, rhs: BrainStructure) -> Bool { lhs.id == rhs.id }
 }
