@@ -27,7 +27,7 @@ final class QuizViewModel {
             let loadedAll = AtlasLoader.load()
             let loadedBrainOnly = loadedAll.filter { $0.modelFileName != nil && $0.isBrainStructure && !$0.isGroup }
             
-            await MainActor.run {
+            await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.allStructures = loadedAll
                 self.brainOnlyStructures = loadedBrainOnly
@@ -60,7 +60,7 @@ final class QuizViewModel {
         
         Task.detached { [weak self] in
             let newScene = Self.buildSceneNode(target: target)
-            await MainActor.run {
+            await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.options = generatedOptions
                 self.scene = newScene

@@ -61,13 +61,15 @@ final class ExploreViewModel {
                 ? SCNVector3(totalX / count, totalY / count, totalZ / count)
                 : SCNVector3Zero
             
-            await MainActor.run {
+            let finalNodes = nodes
+            let finalPositions = positions
+            await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.allStructures = loaded
                 self.brainStructures = brainOnly
                 self.scene = newScene
-                self.structureNodes = nodes
-                self.originalPositions = positions
+                self.structureNodes = finalNodes
+                self.originalPositions = finalPositions
                 self.brainCenter = center
                 self.isLoading = false
             }

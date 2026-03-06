@@ -5,7 +5,7 @@ import SceneKit.ModelIO
 
 // MARK: - Atlas Loader
 
-final class AtlasLoader {
+nonisolated final class AtlasLoader {
     
     static func load() -> [BrainStructure] {
         guard let url = Bundle.main.url(forResource: "atlasStructure", withExtension: "json"),
@@ -77,7 +77,7 @@ final class AtlasLoader {
 
 // MARK: - Model Loader (OBJ → SCNNode)
 
-final class ModelCache {
+nonisolated final class ModelCache: @unchecked Sendable {
     static let shared = ModelCache()
     private var cache: [String: SCNNode] = [:]
     private let queue = DispatchQueue(label: "modelcache")
@@ -88,7 +88,7 @@ final class ModelCache {
         }
         
         guard let url = Bundle.main.url(forResource: fileName.replacingOccurrences(of: ".obj", with: ""),
-                                         withExtension: "obj", subdirectory: "BrainModels") else {
+                                         withExtension: "obj") else {
             return nil
         }
         

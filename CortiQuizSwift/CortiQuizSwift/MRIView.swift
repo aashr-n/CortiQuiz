@@ -41,12 +41,15 @@ final class MRIViewModel {
                 globalMaxY = max(globalMaxY, bmax.y)
             }
             
-            await MainActor.run {
+            let finalNodes = nodes
+            let finalMinY = globalMinY
+            let finalMaxY = globalMaxY
+            await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.scene = newScene
-                self.whiteNodes = nodes
-                self.minY = globalMinY
-                self.maxY = globalMaxY
+                self.whiteNodes = finalNodes
+                self.minY = finalMinY
+                self.maxY = finalMaxY
                 self.isLoading = false
                 self.updateClip()
             }

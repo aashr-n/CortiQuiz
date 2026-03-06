@@ -35,7 +35,11 @@
 - Explode view: factor 0 = collapsed to origin (by design — offset-based), factor > 0 spreads outward
 
 ## Bug Fixes Applied (2026-03-03)
+- **Model Loading Fix**: `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` made `AtlasLoader`, `ModelCache`, `AtlasEntry`, `BrainStructure`, and `Color.fromRGB` implicitly `@MainActor` — they couldn't be called from `Task.detached`. Fixed by adding explicit `nonisolated` to all data/utility types. `ModelCache` also marked `@unchecked Sendable` (uses internal `DispatchQueue` for thread safety).
 - **SceneKitView**: Camera/lights now added via `ensureSceneSetup()` on every scene change (was lost on new scenes)
 - **All ViewModels**: Added `@MainActor`, switched to `Task.detached` + `weak self` + `nonisolated static` helpers
 - **Setup guards**: `setupStarted` flag prevents double-setup race conditions
 - **QuizView Performance**: Offloaded heavy 3D model parsing (`AtlasLoader.load`) and target scene assembling (`buildSceneNode`) to `Task.detached` to resolve critical Main thread blocking and UI freezing. Implemented `isLoading` unified indicator. Verified thread safety for `applyTransparency/Color`. Code inspected and passed 3 back-to-back checks.
+- **OBJ Asset Reconversion (2026-03-03)**: All 359 OBJ files had 0 face definitions (only vertex data) — previous VTK→OBJ conversion was broken. Reconverted using Python VTK lib with custom writer (simple `f v1 v2 v3` format for MDLAsset compatibility). Every file now has proper vertex + face data. No Swift code changes needed for loading.
+- **Concurrency Fix (2026-03-03)**: Added `[weak self]` capture lists to all `MainActor.run` closures in `ExploreView`, `MRIView`, `QuizView`. Captured mutable local vars (`nodes`, `positions`, `globalMinY`, `globalMaxY`) into `let` constants before `MainActor.run` boundary.
+- **Bundle Path Fix (2026-03-03)**: `ModelCache.node(for:)` used `subdirectory: "BrainModels"` but `PBXFileSystemSynchronizedRootGroup` copies OBJ files to bundle root (no subdirectory). Removed `subdirectory` param — was the actual cause of invisible models (Bundle.main.url always returned nil).

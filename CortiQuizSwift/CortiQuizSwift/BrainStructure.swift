@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - JSON Decodable types from atlasStructure.json
 
-struct AtlasEntry: Decodable {
+nonisolated struct AtlasEntry: Decodable {
     let id: String
     let type: String
     let annotation: Annotation?
@@ -61,7 +61,7 @@ struct AtlasEntry: Decodable {
 
 // MARK: - Domain Model
 
-struct BrainStructure: Identifiable, Hashable {
+nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let color: Color
@@ -98,11 +98,13 @@ struct BrainStructure: Identifiable, Hashable {
 // MARK: - Color Parsing
 
 extension Color {
-    static func fromRGB(_ str: String?) -> Color {
+    nonisolated static func fromRGB(_ str: String?) -> Color {
         guard let str = str,
               str.hasPrefix("rgb("),
-              let inner = str.dropFirst(4).dropLast().components(separatedBy: ",") as [Substring]?,
-              inner.count == 3,
+              str.hasSuffix(")")
+        else { return .gray }
+        let inner = String(str.dropFirst(4).dropLast()).split(separator: ",")
+        guard inner.count == 3,
               let r = Double(inner[0].trimmingCharacters(in: .whitespaces)),
               let g = Double(inner[1].trimmingCharacters(in: .whitespaces)),
               let b = Double(inner[2].trimmingCharacters(in: .whitespaces))
