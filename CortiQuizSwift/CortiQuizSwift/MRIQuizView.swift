@@ -15,6 +15,7 @@ final class MRIQuizViewModel {
     var showingFeedback = false
     var isLoading = true
     var slicePosition: Float = 0.5
+    var targetColor: Color = .white
     
     // Mini-brain scene (single gray color, with slice plane)
     var miniBrainScene = SCNScene()
@@ -31,10 +32,10 @@ final class MRIQuizViewModel {
     
     nonisolated static let cameraZ: Float = 300
     
-    // Bright highlight for pulse peak
-    nonisolated static let highlightBright = UIColor(red: 0.95, green: 1.0, blue: 1.0, alpha: 1.0)
-    // Dim highlight for pulse trough (still distinguishable)
-    nonisolated static let highlightDim = UIColor(red: 0.3, green: 0.7, blue: 0.65, alpha: 1.0)
+    // Bright highlight for pulse peak — pure white
+    nonisolated static let highlightBright = UIColor.white
+    // Dim highlight for pulse trough — black
+    nonisolated static let highlightDim = UIColor.black
     
     func setup() {
         guard !setupStarted else { return }
@@ -172,6 +173,7 @@ final class MRIQuizViewModel {
         slicePosition = (targetSlice - minZ) / (maxZ - minZ)
         
         correctAnswer = target.baseName
+        targetColor = target.color
         
         var optionSet = Set<String>([target.baseName])
         let shuffled = brainStructures.shuffled()
@@ -258,6 +260,7 @@ final class MRIQuizViewModel {
 struct MRIQuizView: View {
     @State private var vm = MRIQuizViewModel()
     @State private var pulsePhase = false
+    @State private var wrongFlash = false
     
     var body: some View {
         ZStack {
@@ -334,9 +337,9 @@ struct MRIQuizView: View {
                     VStack(spacing: 12) {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(Color.white)
+                                .fill(vm.targetColor)
                                 .frame(width: 10, height: 10)
-                                .shadow(color: .white.opacity(0.8), radius: 4)
+                                .shadow(color: vm.targetColor.opacity(0.8), radius: 4)
                             Text("Identify the highlighted region")
                                 .font(.headline)
                                 .foregroundColor(.white)
@@ -345,6 +348,9 @@ struct MRIQuizView: View {
                         ForEach(vm.options, id: \.self) { option in
                             Button {
                                 vm.answer(option)
+                                if !vm.isCorrect(option) {
+                                    triggerWrongFlash()
+                                }
                             } label: {
                                 HStack {
                                     Text(option)
@@ -361,7 +367,7 @@ struct MRIQuizView: View {
                                     }
                                 }
                                 .padding()
-                                .background(optionBackground(option))
+                                .background(wrongAnswerBg(option))
                                 .foregroundColor(.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
@@ -408,10 +414,21 @@ struct MRIQuizView: View {
         }
     }
     
-    private func optionBackground(_ option: String) -> Color {
+    private func triggerWrongFlash() {
+        withAnimation(.easeInOut(duration: 0.15).repeatCount(3, autoreverses: true)) {
+            wrongFlash = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            wrongFlash = false
+        }
+    }
+    
+    private func wrongAnswerBg(_ option: String) -> Color {
         guard vm.showingFeedback else { return Color.white.opacity(0.1) }
         if vm.isCorrect(option) { return Color.green.opacity(0.3) }
-        if vm.selectedAnswer == option { return Color.red.opacity(0.3) }
+        if vm.selectedAnswer == option && !vm.isCorrect(option) {
+            return wrongFlash ? Color.white.opacity(0.6) : Color.red.opacity(0.4)
+        }
         return Color.white.opacity(0.05)
     }
 }

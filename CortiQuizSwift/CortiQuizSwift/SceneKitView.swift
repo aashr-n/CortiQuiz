@@ -50,13 +50,13 @@ struct SceneKitView: UIViewRepresentable {
         guard scene.rootNode.childNode(withName: "mainCamera", recursively: false) == nil else { return }
         
         let camera = SCNCamera()
-        camera.fieldOfView = 40
+        camera.fieldOfView = 55
         camera.zNear = 1
         camera.zFar = 2000
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        // Look from front-elevated (anterior = -Y in RAS) with superior (Z) as up
-        cameraNode.position = SCNVector3(0, -300, 40)
+        // Left-lateral view: camera from +X looking along -X, Z-up
+        cameraNode.position = SCNVector3(300, 0, 40)
         cameraNode.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         cameraNode.name = "mainCamera"
         scene.rootNode.addChildNode(cameraNode)
@@ -89,7 +89,7 @@ struct SceneKitView: UIViewRepresentable {
         guard let camera = view.scene?.rootNode.childNode(withName: "mainCamera", recursively: true) else { return }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.5
-        camera.position = SCNVector3(0, -300, 40)
+        camera.position = SCNVector3(300, 0, 40)
         camera.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         SCNTransaction.commit()
     }
@@ -130,7 +130,7 @@ extension SCNView {
         if let camera = scene?.rootNode.childNode(withName: "mainCamera", recursively: true) {
             SCNTransaction.begin()
             SCNTransaction.animationDuration = duration
-            camera.position = SCNVector3(center.x, center.y - distance, center.z)
+            camera.position = SCNVector3(center.x + distance, center.y, center.z)
             camera.look(at: center, up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
             SCNTransaction.commit()
         }

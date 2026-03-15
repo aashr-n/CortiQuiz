@@ -64,3 +64,6 @@
 - **MRI Quiz Pulsing Highlight (2026-03-14)**: Target region in MRI quiz renders two snapshots (bright white at peak, dim teal at trough) and SwiftUI `.opacity` animation pulses between them at 0.8s ease-in-out. Replaces static cyan highlight.
 - **Monochrome Main Menu (2026-03-14)**: Background changed to pure black gradient `(0a0a0a→151515)`. Title is solid white (no purple gradient). All mode card icon backgrounds use gray `(404040→2a2a2a)`.
 - **Mini-Brain in MRI Quiz (2026-03-14)**: Added single-color gray mini-brain (120×120pt) with slice plane indicator to `MRIQuizView`. Uses shared `MiniBrainView` (made internal from private in `MRIView.swift`). All nodes rendered in `UIColor(white: 0.7, alpha: 0.35)`.
+- **Unified Gray Mini-Brain (2026-03-14)**: MRI explore mode mini-brain changed from atlas colors to single gray `UIColor(white: 0.7, alpha: 0.35)` — now matches MRI quiz mini-brain.
+- **Stronger MRI Quiz Pulse (2026-03-14)**: Pulse highlight changed from subtle teal/white to full white→black cycle for maximum contrast. Dot indicator now matches target region's atlas color.
+- **Wrong Answer Flash (2026-03-14)**: Incorrect MRI quiz answers flash red→white 3 times via `repeatCount(3)` animation on background color.

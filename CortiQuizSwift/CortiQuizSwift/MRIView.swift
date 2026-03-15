@@ -60,10 +60,10 @@ final class MRIViewModel {
                 globalMinZ = min(globalMinZ, bmin.z)
                 globalMaxZ = max(globalMaxZ, bmax.z)
                 
-                // Mini-brain node — atlas colors, translucent
+                // Mini-brain node — single gray, translucent
                 if let miniNode = ModelCache.shared.node(for: fn) {
-                    let atlasColor = UIColor(s.color).withAlphaComponent(0.35)
-                    Self.applyMaterial(to: miniNode, color: atlasColor)
+                    let gray = UIColor(white: 0.7, alpha: 0.35)
+                    Self.applyMaterial(to: miniNode, color: gray)
                     miniScene.rootNode.addChildNode(miniNode)
                 }
             }
