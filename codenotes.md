@@ -18,7 +18,8 @@
 | `MainMenuView.swift` | 3-mode menu with dark gradient design |
 | `QuizView.swift` | Quiz mode — random structure quiz with ghost brain overlay |
 | `ExploreView.swift` | Explore mode — all structures, search, tap-select, explode slider |
-| `MRIView.swift` | MRI mode — white matter with fragment shader clipping plane |
+| `MRIView.swift` | MRI mode — 2D slice rendering with 4-color palette + mini-brain |
+| `MRIQuizView.swift` | MRI quiz — identify structures from 2D MRI slices |
 | `ContentView.swift` | Entry point → `MainMenuView` |
 
 ## Data
@@ -54,3 +55,9 @@
 - **Rotation Fix (2026-03-06)**: Replaced `orbitTurntable` with `orbitArcball` in `SceneKitView` for free-form 3D rotation, resolving unnatural constraints when viewing the RAS-oriented brain.
 - **MRI 4-Color Theorem (2026-03-06)**: Removed fragile `isWhiteMatter` logic. MRI mode now assigns 4 distinct anatomical colors (cream, blue, rose, sage) deterministically by structure index.
 - **MRI Black Screen Fix (2026-03-06)**: Fixed bug where MRI showed a black screen because `_surface.position.z` in SceneKit's fragment shader is view-space, not world-space. Subtracted camera's Z position (`300`) from the world-space `clipZ` to compare accurately against view-space fragments.
+- **Navigation Fix (2026-03-14)**: Switched `SceneKitView` from `orbitArcball` to `orbitAngleMapping` to prevent inverse/gimbal-flip spinning. Elevated default camera to `(0,-300,40)` for a more natural anterior-elevated view instead of dead-on horizontal.
+- **MRI 4-Color Palette (2026-03-14)**: Updated 4-color palette to warm sand `(0.92,0.82,0.62)`, slate blue `(0.45,0.58,0.78)`, dusty mauve `(0.76,0.52,0.62)`, eucalyptus `(0.48,0.72,0.58)` — better contrast and medical-imaging aesthetic.
+- **MRI Slice-Only Coloring (2026-03-14)**: 4-color scheme now applied only to the `SCNRenderer` scene used for 2D slice snapshots. The mini-brain uses original atlas colors at 35% opacity.
+- **MRI Mini-Brain (2026-03-14)**: Added `MiniBrainView` (140×140pt) in MRI mode's bottom-left corner. Shows translucent brain with atlas colors + `SCNPlane` slice indicator tracking slider position. Self-contained `UIViewRepresentable` with `orbitAngleMapping`, independently spinnable.
+- **MRI Quiz Mode (2026-03-14)**: New `MRIQuizView.swift` — picks random structure, slices at its Z range, highlights target in cyan `(0.1,0.95,0.85)`, renders 2D snapshot. 4 multiple-choice answers with score tracking. Added as 4th card in `MainMenuView`.
+

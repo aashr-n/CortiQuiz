@@ -14,9 +14,9 @@ struct SceneKitView: UIViewRepresentable {
         view.antialiasingMode = .multisampling4X
         view.allowsCameraControl = allowsCameraControl
         
-        // Enable two-finger pan via orbit turntable mode
-        // Set worldUp to Z to match RAS coordinate brain orientation
-        view.defaultCameraController.interactionMode = .orbitArcball
+        // Constrained orbit prevents gimbal-flip (inverse spin)
+        // worldUp = Z matches RAS coordinate brain orientation
+        view.defaultCameraController.interactionMode = .orbitAngleMapping
         view.defaultCameraController.worldUp = SCNVector3(0, 0, 1)
         
         if onTap != nil {
@@ -55,8 +55,8 @@ struct SceneKitView: UIViewRepresentable {
         camera.zFar = 2000
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        // Look from front (anterior = -Y in RAS) with superior (Z) as up
-        cameraNode.position = SCNVector3(0, -300, 10)
+        // Look from front-elevated (anterior = -Y in RAS) with superior (Z) as up
+        cameraNode.position = SCNVector3(0, -300, 40)
         cameraNode.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         cameraNode.name = "mainCamera"
         scene.rootNode.addChildNode(cameraNode)
@@ -89,7 +89,7 @@ struct SceneKitView: UIViewRepresentable {
         guard let camera = view.scene?.rootNode.childNode(withName: "mainCamera", recursively: true) else { return }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.5
-        camera.position = SCNVector3(0, -300, 10)
+        camera.position = SCNVector3(0, -300, 40)
         camera.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         SCNTransaction.commit()
     }

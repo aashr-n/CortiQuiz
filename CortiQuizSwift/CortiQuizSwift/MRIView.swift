@@ -9,8 +9,12 @@ final class MRIViewModel {
     var isLoading = true
     var sliceImage: UIImage?
     
+    // Mini-brain scene (atlas colors, translucent, with slice plane)
+    var miniBrainScene = SCNScene()
+    var recenterMini = false
+    
     private var allNodes: [SCNNode] = []
-    private var nodeColors: [UIColor] = []  // 4-color assignment per node
+    private var nodeColors: [UIColor] = []  // 4-color per node for MRI render
     // Z-axis bounds (superior-inferior in RAS)
     private var minZ: Float = 0
     private var maxZ: Float = 0
@@ -19,15 +23,18 @@ final class MRIViewModel {
     private var renderer: SCNRenderer?
     private var mriScene: SCNScene?
     
-    // Camera Z position — must match setupRenderer
+    // Slice plane node in mini-brain
+    private var slicePlaneNode: SCNNode?
+    
+    // Camera Z for MRI renderer
     nonisolated static let cameraZ: Float = 300
     
-    // 4 distinct MRI-palette colors (four color theorem)
+    // 4-color MRI palette (applied only to 2D slice render)
     nonisolated static let regionColors: [UIColor] = [
-        UIColor(red: 0.95, green: 0.85, blue: 0.55, alpha: 1.0),  // warm cream
-        UIColor(red: 0.60, green: 0.75, blue: 0.90, alpha: 1.0),  // soft blue
-        UIColor(red: 0.85, green: 0.55, blue: 0.65, alpha: 1.0),  // muted rose
-        UIColor(red: 0.55, green: 0.80, blue: 0.65, alpha: 1.0),  // sage green
+        UIColor(red: 0.92, green: 0.82, blue: 0.62, alpha: 1.0),  // warm sand
+        UIColor(red: 0.45, green: 0.58, blue: 0.78, alpha: 1.0),  // slate blue
+        UIColor(red: 0.76, green: 0.52, blue: 0.62, alpha: 1.0),  // dusty mauve
+        UIColor(red: 0.48, green: 0.72, blue: 0.58, alpha: 1.0),  // eucalyptus
     ]
     
     func setup() {
@@ -36,7 +43,8 @@ final class MRIViewModel {
         isLoading = true
         
         Task.detached { [weak self] in
-            let newScene = SCNScene()
+            let mriScene = SCNScene()
+            let miniScene = SCNScene()
             let structures = AtlasLoader.load()
             let brainStructures = structures.filter { $0.modelFileName != nil && $0.isBrainStructure && !$0.isGroup }
             
@@ -46,17 +54,68 @@ final class MRIViewModel {
             var globalMaxZ: Float = -.greatestFiniteMagnitude
             
             for (i, s) in brainStructures.enumerated() {
-                guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
+                guard let fn = s.modelFileName else { continue }
+                
+                // MRI renderer node — 4-color
+                guard let mriNode = ModelCache.shared.node(for: fn) else { continue }
                 let color = Self.regionColors[i % Self.regionColors.count]
-                Self.applyMaterial(to: node, color: color)
-                newScene.rootNode.addChildNode(node)
-                nodes.append(node)
+                Self.applyMaterial(to: mriNode, color: color)
+                mriScene.rootNode.addChildNode(mriNode)
+                nodes.append(mriNode)
                 colors.append(color)
                 
-                let (bmin, bmax) = node.boundingBox
+                let (bmin, bmax) = mriNode.boundingBox
                 globalMinZ = min(globalMinZ, bmin.z)
                 globalMaxZ = max(globalMaxZ, bmax.z)
+                
+                // Mini-brain node — atlas colors, translucent
+                if let miniNode = ModelCache.shared.node(for: fn) {
+                    let atlasColor = UIColor(s.color).withAlphaComponent(0.35)
+                    Self.applyMaterial(to: miniNode, color: atlasColor)
+                    miniScene.rootNode.addChildNode(miniNode)
+                }
             }
+            
+            // Add slice plane to mini scene
+            let planeHeight: Float = Float(globalMaxZ - globalMinZ) * 0.8
+            let plane = SCNPlane(width: CGFloat(planeHeight), height: CGFloat(planeHeight))
+            let planeMat = SCNMaterial()
+            planeMat.diffuse.contents = UIColor(red: 0.2, green: 0.9, blue: 0.7, alpha: 0.45)
+            planeMat.isDoubleSided = true
+            planeMat.blendMode = .alpha
+            plane.materials = [planeMat]
+            let planeNode = SCNNode(geometry: plane)
+            planeNode.name = "slicePlane"
+            // SCNPlane lies in XY (normal +Z) — perfect for axial slice positioning
+            let midZ = (globalMinZ + globalMaxZ) / 2
+            planeNode.position = SCNVector3(0, 0, midZ)
+            miniScene.rootNode.addChildNode(planeNode)
+            
+            // Mini-brain camera + lighting
+            let cam = SCNCamera()
+            cam.fieldOfView = 40
+            cam.zNear = 1
+            cam.zFar = 2000
+            let camNode = SCNNode()
+            camNode.camera = cam
+            camNode.position = SCNVector3(0, -300, 40)
+            camNode.look(at: SCNVector3(0, 0, midZ), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
+            camNode.name = "miniCamera"
+            miniScene.rootNode.addChildNode(camNode)
+            
+            let ambient = SCNNode()
+            ambient.light = SCNLight()
+            ambient.light?.type = .ambient
+            ambient.light?.intensity = 500
+            ambient.light?.color = UIColor.white
+            miniScene.rootNode.addChildNode(ambient)
+            
+            let dir = SCNNode()
+            dir.light = SCNLight()
+            dir.light?.type = .directional
+            dir.light?.intensity = 600
+            dir.eulerAngles = SCNVector3(-Float.pi / 4, Float.pi / 4, 0)
+            miniScene.rootNode.addChildNode(dir)
             
             let finalNodes = nodes
             let finalColors = colors
@@ -64,11 +123,13 @@ final class MRIViewModel {
             let finalMaxZ = globalMaxZ
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                self.mriScene = newScene
+                self.mriScene = mriScene
+                self.miniBrainScene = miniScene
                 self.allNodes = finalNodes
                 self.nodeColors = finalColors
                 self.minZ = finalMinZ
                 self.maxZ = finalMaxZ
+                self.slicePlaneNode = planeNode
                 self.setupRenderer()
                 self.isLoading = false
                 self.updateSlice()
@@ -107,12 +168,14 @@ final class MRIViewModel {
     func updateSlice() {
         let clipZ = minZ + (maxZ - minZ) * slicePosition
         let thickness: Float = 2.0
-        // Convert world-space Z to view-space Z (camera at +cameraZ looking toward origin)
         let viewClipZ = clipZ - Self.cameraZ
         for (i, node) in allNodes.enumerated() {
             applyClipShader(to: node, viewClipZ: viewClipZ, thickness: thickness, color: nodeColors[i])
         }
         renderSnapshot()
+        
+        // Move mini-brain slice plane
+        slicePlaneNode?.position.z = clipZ
     }
     
     private func renderSnapshot() {
@@ -157,6 +220,30 @@ final class MRIViewModel {
     }
 }
 
+// MARK: - Mini Brain SceneKit View (self-contained, no external camera setup)
+
+private struct MiniBrainView: UIViewRepresentable {
+    let scene: SCNScene
+    
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.autoenablesDefaultLighting = false
+        view.backgroundColor = UIColor(white: 0.06, alpha: 1.0)
+        view.antialiasingMode = .multisampling4X
+        view.allowsCameraControl = true
+        view.defaultCameraController.interactionMode = .orbitAngleMapping
+        view.defaultCameraController.worldUp = SCNVector3(0, 0, 1)
+        view.scene = scene
+        return view
+    }
+    
+    func updateUIView(_ view: SCNView, context: Context) {
+        if view.scene !== scene {
+            view.scene = scene
+        }
+    }
+}
+
 // MARK: - MRI View
 
 struct MRIView: View {
@@ -181,27 +268,43 @@ struct MRIView: View {
                         .foregroundColor(.white)
                         .padding(.top, 8)
                     
-                    ZStack {
-                        Color(white: 0.05)
-                        
-                        if let img = vm.sliceImage {
-                            Image(uiImage: img)
-                                .resizable()
-                                .scaledToFit()
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .padding(8)
+                    // MRI slice image + mini-brain overlay
+                    ZStack(alignment: .bottomLeading) {
+                        // 2D slice
+                        ZStack {
+                            Color(white: 0.05)
+                            
+                            if let img = vm.sliceImage {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .padding(8)
+                            }
                         }
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                        )
+                        
+                        // Mini 3D brain
+                        MiniBrainView(scene: vm.miniBrainScene)
+                            .frame(width: 140, height: 140)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+                            .padding(10)
                     }
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                    )
                     .padding(.horizontal)
                     
                     Spacer().frame(height: 12)
                     
+                    // Slider
                     VStack(spacing: 6) {
                         HStack {
                             Text("Inferior")

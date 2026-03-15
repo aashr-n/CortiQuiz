@@ -67,6 +67,17 @@ struct MainMenuView: View {
                         }
                         .opacity(appear ? 1 : 0)
                         .offset(y: appear ? 0 : 30)
+                        
+                        NavigationLink(destination: MRIQuizView()) {
+                            ModeCard(
+                                icon: "brain.filled.head.profile",
+                                title: "MRI Quiz",
+                                subtitle: "Identify structures from slices",
+                                gradient: [Color(hex: "14b8a6"), Color(hex: "0d9488")]
+                            )
+                        }
+                        .opacity(appear ? 1 : 0)
+                        .offset(y: appear ? 0 : 30)
                     }
                     .padding(.horizontal)
                     
