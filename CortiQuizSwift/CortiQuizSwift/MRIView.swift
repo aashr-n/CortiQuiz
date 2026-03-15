@@ -14,7 +14,7 @@ final class MRIViewModel {
     var recenterMini = false
     
     private var allNodes: [SCNNode] = []
-    private var nodeColors: [UIColor] = []  // 4-color per node for MRI render
+    private var nodeColors: [UIColor] = []  // atlas color per node for MRI render
     // Z-axis bounds (superior-inferior in RAS)
     private var minZ: Float = 0
     private var maxZ: Float = 0
@@ -28,14 +28,6 @@ final class MRIViewModel {
     
     // Camera Z for MRI renderer
     nonisolated static let cameraZ: Float = 300
-    
-    // 4-color MRI palette (applied only to 2D slice render)
-    nonisolated static let regionColors: [UIColor] = [
-        UIColor(red: 0.92, green: 0.82, blue: 0.62, alpha: 1.0),  // warm sand
-        UIColor(red: 0.45, green: 0.58, blue: 0.78, alpha: 1.0),  // slate blue
-        UIColor(red: 0.76, green: 0.52, blue: 0.62, alpha: 1.0),  // dusty mauve
-        UIColor(red: 0.48, green: 0.72, blue: 0.58, alpha: 1.0),  // eucalyptus
-    ]
     
     func setup() {
         guard !setupStarted else { return }
@@ -53,12 +45,12 @@ final class MRIViewModel {
             var globalMinZ: Float = .greatestFiniteMagnitude
             var globalMaxZ: Float = -.greatestFiniteMagnitude
             
-            for (i, s) in brainStructures.enumerated() {
+            for s in brainStructures {
                 guard let fn = s.modelFileName else { continue }
                 
-                // MRI renderer node — 4-color
+                // MRI renderer node — atlas color
                 guard let mriNode = ModelCache.shared.node(for: fn) else { continue }
-                let color = Self.regionColors[i % Self.regionColors.count]
+                let color = UIColor(s.color)
                 Self.applyMaterial(to: mriNode, color: color)
                 mriScene.rootNode.addChildNode(mriNode)
                 nodes.append(mriNode)
@@ -222,7 +214,7 @@ final class MRIViewModel {
 
 // MARK: - Mini Brain SceneKit View (self-contained, no external camera setup)
 
-private struct MiniBrainView: UIViewRepresentable {
+struct MiniBrainView: UIViewRepresentable {
     let scene: SCNScene
     
     func makeUIView(context: Context) -> SCNView {

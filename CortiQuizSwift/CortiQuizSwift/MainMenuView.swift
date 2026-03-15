@@ -8,7 +8,7 @@ struct MainMenuView: View {
             ZStack {
                 // Background
                 LinearGradient(
-                    colors: [Color(hex: "0a0a1a"), Color(hex: "1a1a3e")],
+                    colors: [Color(hex: "0a0a0a"), Color(hex: "151515")],
                     startPoint: .top, endPoint: .bottom
                 )
                 .ignoresSafeArea()
@@ -20,10 +20,7 @@ struct MainMenuView: View {
                     VStack(spacing: 8) {
                         Text("CortiQuiz")
                             .font(.system(size: 42, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(colors: [.white, Color(hex: "8b5cf6")],
-                                             startPoint: .leading, endPoint: .trailing)
-                            )
+                            .foregroundColor(.white)
                         Text("Brain Anatomy Trainer")
                             .font(.subheadline)
                             .foregroundColor(.gray)
@@ -40,7 +37,7 @@ struct MainMenuView: View {
                                 icon: "brain.head.profile",
                                 title: "Normal Mode",
                                 subtitle: "Identify brain structures",
-                                gradient: [Color(hex: "6366f1"), Color(hex: "8b5cf6")]
+                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
                             )
                         }
                         .opacity(appear ? 1 : 0)
@@ -51,7 +48,7 @@ struct MainMenuView: View {
                                 icon: "cube.transparent",
                                 title: "Explore Mode",
                                 subtitle: "Browse the full brain atlas",
-                                gradient: [Color(hex: "06b6d4"), Color(hex: "3b82f6")]
+                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
                             )
                         }
                         .opacity(appear ? 1 : 0)
@@ -62,7 +59,7 @@ struct MainMenuView: View {
                                 icon: "waveform.path.ecg",
                                 title: "MRI Mode",
                                 subtitle: "Dynamic brain cross-sections",
-                                gradient: [Color(hex: "10b981"), Color(hex: "059669")]
+                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
                             )
                         }
                         .opacity(appear ? 1 : 0)
@@ -73,7 +70,7 @@ struct MainMenuView: View {
                                 icon: "brain.filled.head.profile",
                                 title: "MRI Quiz",
                                 subtitle: "Identify structures from slices",
-                                gradient: [Color(hex: "14b8a6"), Color(hex: "0d9488")]
+                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
                             )
                         }
                         .opacity(appear ? 1 : 0)

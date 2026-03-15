@@ -60,4 +60,7 @@
 - **MRI Slice-Only Coloring (2026-03-14)**: 4-color scheme now applied only to the `SCNRenderer` scene used for 2D slice snapshots. The mini-brain uses original atlas colors at 35% opacity.
 - **MRI Mini-Brain (2026-03-14)**: Added `MiniBrainView` (140×140pt) in MRI mode's bottom-left corner. Shows translucent brain with atlas colors + `SCNPlane` slice indicator tracking slider position. Self-contained `UIViewRepresentable` with `orbitAngleMapping`, independently spinnable.
 - **MRI Quiz Mode (2026-03-14)**: New `MRIQuizView.swift` — picks random structure, slices at its Z range, highlights target in cyan `(0.1,0.95,0.85)`, renders 2D snapshot. 4 multiple-choice answers with score tracking. Added as 4th card in `MainMenuView`.
-
+- **Atlas Colors in MRI Modes (2026-03-14)**: Removed 4-color theory palette from both `MRIView` and `MRIQuizView`. Both now use `UIColor(s.color)` (original brain atlas colors) for 2D slice rendering.
+- **MRI Quiz Pulsing Highlight (2026-03-14)**: Target region in MRI quiz renders two snapshots (bright white at peak, dim teal at trough) and SwiftUI `.opacity` animation pulses between them at 0.8s ease-in-out. Replaces static cyan highlight.
+- **Monochrome Main Menu (2026-03-14)**: Background changed to pure black gradient `(0a0a0a→151515)`. Title is solid white (no purple gradient). All mode card icon backgrounds use gray `(404040→2a2a2a)`.
+- **Mini-Brain in MRI Quiz (2026-03-14)**: Added single-color gray mini-brain (120×120pt) with slice plane indicator to `MRIQuizView`. Uses shared `MiniBrainView` (made internal from private in `MRIView.swift`). All nodes rendered in `UIColor(white: 0.7, alpha: 0.35)`.
