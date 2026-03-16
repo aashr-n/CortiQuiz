@@ -22,6 +22,7 @@ final class MRIQuizViewModel {
     
     private var brainStructures: [BrainStructure] = []
     private var allNodes: [(node: SCNNode, structure: BrainStructure)] = []
+    private var miniNodes: [String: SCNNode] = [:]
     private var mriScene: SCNScene?
     private var renderer: SCNRenderer?
     private var minZ: Float = 0
@@ -67,6 +68,7 @@ final class MRIQuizViewModel {
                 if let miniNode = ModelCache.shared.node(for: fn) {
                     let gray = UIColor(white: 0.7, alpha: 0.35)
                     Self.applyMaterial(to: miniNode, color: gray)
+                    miniNode.name = s.id
                     miniScene.rootNode.addChildNode(miniNode)
                 }
             }
@@ -114,12 +116,21 @@ final class MRIQuizViewModel {
             let finalEntries = entries
             let finalMinZ = globalMinZ
             let finalMaxZ = globalMaxZ
+            // Build mini-node lookup by name
+            var miniNodeMap: [String: SCNNode] = [:]
+            for child in miniScene.rootNode.childNodes {
+                if let name = child.name, name != "slicePlane" && name != "miniCamera" {
+                    miniNodeMap[name] = child
+                }
+            }
+            let finalMiniNodes = miniNodeMap
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.mriScene = newScene
                 self.miniBrainScene = miniScene
                 self.brainStructures = brainOnly
                 self.allNodes = finalEntries
+                self.miniNodes = finalMiniNodes
                 self.minZ = finalMinZ
                 self.maxZ = finalMaxZ
                 self.slicePlaneNode = planeNode
@@ -183,24 +194,35 @@ final class MRIQuizViewModel {
         }
         options = Array(optionSet).shuffled()
         
+        // Reset mini-brain to gray
+        resetMiniBrain()
+        
         // Render two snapshots for pulsing effect
         let clipZ = targetSlice
         let thickness: Float = 2.0
         let viewClipZ = clipZ - Self.cameraZ
         
-        // Bright frame: target in bright white
+        // Bright frame: target in bright white, non-target dimmed
         for (i, entry) in allNodes.enumerated() {
-            let color = (i == targetIdx) ? Self.highlightBright : UIColor(entry.structure.color)
-            applyClipShader(to: entry.node, viewClipZ: viewClipZ, thickness: thickness, color: color)
+            if i == targetIdx {
+                applyClipShader(to: entry.node, viewClipZ: viewClipZ, thickness: thickness, color: Self.highlightBright)
+            } else {
+                let dimmed = Self.dimmedColor(UIColor(entry.structure.color))
+                applyClipShader(to: entry.node, viewClipZ: viewClipZ, thickness: thickness, color: dimmed)
+            }
         }
         guard let renderer else { isLoading = false; return }
         let size = CGSize(width: 512, height: 512)
         sliceImageBright = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
         
-        // Dim frame: target in dim teal
+        // Dim frame: target in dim highlight, non-target still dimmed
         for (i, entry) in allNodes.enumerated() {
-            let color = (i == targetIdx) ? Self.highlightDim : UIColor(entry.structure.color)
-            applyClipShader(to: entry.node, viewClipZ: viewClipZ, thickness: thickness, color: color)
+            if i == targetIdx {
+                applyClipShader(to: entry.node, viewClipZ: viewClipZ, thickness: thickness, color: Self.highlightDim)
+            } else {
+                let dimmed = Self.dimmedColor(UIColor(entry.structure.color))
+                applyClipShader(to: entry.node, viewClipZ: viewClipZ, thickness: thickness, color: dimmed)
+            }
         }
         sliceImageDim = renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
         
@@ -216,6 +238,39 @@ final class MRIQuizViewModel {
         showingFeedback = true
         total += 1
         if choice == correctAnswer { score += 1 }
+        showFeedbackOnMiniBrain(chosen: choice)
+    }
+    
+    /// Dim color: 20% brightness, 40% alpha
+    private nonisolated static func dimmedColor(_ color: UIColor) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return UIColor(red: r * 0.2, green: g * 0.2, blue: b * 0.2, alpha: 0.4)
+    }
+    
+    /// Color correct region green and wrong region red on mini-brain
+    private func showFeedbackOnMiniBrain(chosen: String) {
+        guard currentTargetIndex >= 0 && currentTargetIndex < allNodes.count else { return }
+        let correctID = allNodes[currentTargetIndex].structure.id
+        let wrongID: String? = (chosen != correctAnswer)
+            ? allNodes.first(where: { $0.structure.baseName == chosen })?.structure.id
+            : nil
+        
+        for (id, node) in miniNodes {
+            if id == correctID {
+                Self.applyMaterial(to: node, color: UIColor(red: 0.2, green: 0.9, blue: 0.3, alpha: 0.9))
+            } else if let wid = wrongID, id == wid {
+                Self.applyMaterial(to: node, color: UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 0.9))
+            }
+        }
+    }
+    
+    /// Reset mini-brain to uniform gray
+    private func resetMiniBrain() {
+        let gray = UIColor(white: 0.7, alpha: 0.35)
+        for (_, node) in miniNodes {
+            Self.applyMaterial(to: node, color: gray)
+        }
     }
     
     func isCorrect(_ choice: String) -> Bool { choice == correctAnswer }
@@ -260,7 +315,6 @@ final class MRIQuizViewModel {
 struct MRIQuizView: View {
     @State private var vm = MRIQuizViewModel()
     @State private var pulsePhase = false
-    @State private var wrongFlash = false
     
     var body: some View {
         ZStack {
@@ -348,9 +402,6 @@ struct MRIQuizView: View {
                         ForEach(vm.options, id: \.self) { option in
                             Button {
                                 vm.answer(option)
-                                if !vm.isCorrect(option) {
-                                    triggerWrongFlash()
-                                }
                             } label: {
                                 HStack {
                                     Text(option)
@@ -367,7 +418,7 @@ struct MRIQuizView: View {
                                     }
                                 }
                                 .padding()
-                                .background(wrongAnswerBg(option))
+                                .background(answerBg(option))
                                 .foregroundColor(.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
@@ -414,20 +465,11 @@ struct MRIQuizView: View {
         }
     }
     
-    private func triggerWrongFlash() {
-        withAnimation(.easeInOut(duration: 0.15).repeatCount(3, autoreverses: true)) {
-            wrongFlash = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-            wrongFlash = false
-        }
-    }
-    
-    private func wrongAnswerBg(_ option: String) -> Color {
+    private func answerBg(_ option: String) -> Color {
         guard vm.showingFeedback else { return Color.white.opacity(0.1) }
         if vm.isCorrect(option) { return Color.green.opacity(0.3) }
         if vm.selectedAnswer == option && !vm.isCorrect(option) {
-            return wrongFlash ? Color.white.opacity(0.6) : Color.red.opacity(0.4)
+            return Color.red.opacity(0.4)
         }
         return Color.white.opacity(0.05)
     }

@@ -67,3 +67,8 @@
 - **Unified Gray Mini-Brain (2026-03-14)**: MRI explore mode mini-brain changed from atlas colors to single gray `UIColor(white: 0.7, alpha: 0.35)` — now matches MRI quiz mini-brain.
 - **Stronger MRI Quiz Pulse (2026-03-14)**: Pulse highlight changed from subtle teal/white to full white→black cycle for maximum contrast. Dot indicator now matches target region's atlas color.
 - **Wrong Answer Flash (2026-03-14)**: Incorrect MRI quiz answers flash red→white 3 times via `repeatCount(3)` animation on background color.
+- **Lateral Camera View (2026-03-14)**: Default camera moved from anterior `(0,-300,40)` to left-lateral `(300,0,40)` for side profile view of brain. FOV widened from 40° to 55° so entire brain visible without zooming. `recenterCamera` and `focusOn` updated to match lateral orientation.
+- **MRI Layout (2026-03-14)**: MRI explore mode changed from `ZStack` overlay to `HStack` — mini-brain (100×100pt) sits beside the MRI slice instead of blocking it.
+- **MRI Quiz Dimmed Regions (2026-03-14)**: Non-target regions rendered at 20% brightness / 40% alpha for muted appearance. Target continues pulsing white↔black.
+- **MRI Quiz Flash Removed (2026-03-14)**: Removed `wrongFlash` state and `triggerWrongFlash()` animation. Wrong answers show static red background with ✕ icon.
+- **MRI Quiz Mini-Brain Feedback (2026-03-14)**: After answering, correct region turns green `(0.2,0.9,0.3)` and wrong pick turns red `(0.9,0.2,0.2)` on mini-brain. Mini-brain nodes now named by structure ID. Reset to gray on next question.

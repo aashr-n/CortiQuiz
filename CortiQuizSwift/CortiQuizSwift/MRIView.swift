@@ -260,9 +260,9 @@ struct MRIView: View {
                         .foregroundColor(.white)
                         .padding(.top, 8)
                     
-                    // MRI slice image + mini-brain overlay
-                    ZStack(alignment: .bottomLeading) {
-                        // 2D slice
+                    // MRI slice image + mini-brain side-by-side
+                    HStack(spacing: 8) {
+                        // 2D slice (fills available width)
                         ZStack {
                             Color(white: 0.05)
                             
@@ -281,16 +281,15 @@ struct MRIView: View {
                                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
                         )
                         
-                        // Mini 3D brain
+                        // Mini 3D brain (side)
                         MiniBrainView(scene: vm.miniBrainScene)
-                            .frame(width: 140, height: 140)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .frame(width: 100, height: 100)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 14)
+                                RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.white.opacity(0.25), lineWidth: 1)
                             )
                             .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
-                            .padding(10)
                     }
                     .padding(.horizontal)
                     
