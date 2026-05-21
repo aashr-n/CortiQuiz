@@ -6,7 +6,7 @@ import SceneKit
 @MainActor @Observable
 final class QuizViewModel {
     var allStructures: [BrainStructure] = []
-    var brainOnlyStructures: [BrainStructure] = [] // structures with model files, brain-only
+    var brainOnlyStructures: [BrainStructure] = []
     var currentTarget: BrainStructure?
     var options: [String] = []
     var correctAnswer: String = ""
@@ -44,11 +44,10 @@ final class QuizViewModel {
         showingFeedback = false
         isLoading = true
         
-        let target = brainOnlyStructures.randomElement()!
+        guard let target = brainOnlyStructures.randomElement() else { return }
         currentTarget = target
         correctAnswer = target.baseName
         
-        // Generate 3 distractors with different base names
         var optionSet = Set<String>([target.baseName])
         let shuffled = brainOnlyStructures.shuffled()
         for s in shuffled {
@@ -72,10 +71,16 @@ final class QuizViewModel {
     
     func answer(_ choice: String) {
         guard !showingFeedback else { return }
+        Theme.tapHaptic()
         selectedAnswer = choice
         showingFeedback = true
         total += 1
-        if choice == correctAnswer { score += 1 }
+        if choice == correctAnswer {
+            score += 1
+            Theme.successHaptic()
+        } else {
+            Theme.errorHaptic()
+        }
     }
     
     func isCorrect(_ choice: String) -> Bool { choice == correctAnswer }
@@ -83,50 +88,23 @@ final class QuizViewModel {
     private nonisolated static func buildSceneNode(target: BrainStructure) -> SCNScene {
         let newScene = SCNScene()
         
-        // Load ghost brain (white matter hemispheres as transparent reference)
         let ghostFiles = ["Model_2_white_matter_of_left_cerebral_hemisphere.obj",
                           "Model_41_white_matter_of_right_cerebral_hemisphere.obj"]
         for gf in ghostFiles {
             if let node = ModelCache.shared.node(for: gf) {
-                node.geometry?.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.06)
-                node.geometry?.firstMaterial?.transparency = 0.06
-                node.geometry?.firstMaterial?.isDoubleSided = true
-                applyTransparency(to: node, alpha: 0.06)
+                node.applyTransparency(alpha: 0.06)
                 newScene.rootNode.addChildNode(node)
             }
         }
         
-        // Load target structure highlighted in red
         if let modelFile = target.modelFileName, let node = ModelCache.shared.node(for: modelFile) {
             let red = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0)
-            applyColor(to: node, color: red)
+            node.applyColor(red)
             node.name = "target"
             newScene.rootNode.addChildNode(node)
         }
         
         return newScene
-    }
-    
-    private nonisolated static func applyTransparency(to node: SCNNode, alpha: CGFloat) {
-        if let geom = node.geometry {
-            for mat in geom.materials {
-                mat.diffuse.contents = UIColor.white.withAlphaComponent(alpha)
-                mat.transparency = alpha
-                mat.isDoubleSided = true
-                mat.blendMode = .alpha
-            }
-        }
-        for child in node.childNodes { applyTransparency(to: child, alpha: alpha) }
-    }
-    
-    private nonisolated static func applyColor(to node: SCNNode, color: UIColor) {
-        if let geom = node.geometry {
-            for mat in geom.materials {
-                mat.diffuse.contents = color
-                mat.isDoubleSided = true
-            }
-        }
-        for child in node.childNodes { applyColor(to: child, color: color) }
     }
     
     func resetForReentry() {
@@ -149,26 +127,24 @@ struct QuizView: View {
                         .tint(.white)
                         .scaleEffect(1.5)
                     Text("Loading quiz…")
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                 }
             } else {
             VStack(spacing: 0) {
-                // Score bar
                 HStack {
                     Label("\(vm.score)/\(vm.total)", systemImage: "star.fill")
-                        .foregroundColor(Color(hex: "fbbf24"))
-                        .font(.headline)
+                        .foregroundColor(Theme.scoreGold)
+                        .font(Theme.headingFont)
                     Spacer()
                     if let target = vm.currentTarget, vm.showingFeedback {
                         Text(target.name)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .font(Theme.bodyFont)
+                            .foregroundColor(Theme.textSecondary)
                     }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 
-                // 3D View
                 ZStack(alignment: .bottomTrailing) {
                     SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
                         .frame(maxHeight: .infinity)
@@ -186,11 +162,10 @@ struct QuizView: View {
                     .padding(12)
                 }
                 
-                // Question area
                 VStack(spacing: 12) {
                     Text("What structure is highlighted?")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                        .font(Theme.headingFont)
+                        .foregroundColor(Theme.textPrimary)
                     
                     ForEach(vm.options, id: \.self) { option in
                         Button {
@@ -198,16 +173,16 @@ struct QuizView: View {
                         } label: {
                             HStack {
                                 Text(option)
-                                    .font(.subheadline)
+                                    .font(Theme.bodyFont)
                                     .multilineTextAlignment(.leading)
                                 Spacer()
                                 if vm.showingFeedback && vm.isCorrect(option) {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                        .foregroundColor(Theme.correct)
                                 }
                                 if vm.showingFeedback && vm.selectedAnswer == option && !vm.isCorrect(option) {
                                     Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.red)
+                                        .foregroundColor(Theme.incorrect)
                                 }
                             }
                             .padding()
@@ -222,11 +197,11 @@ struct QuizView: View {
                         Button("Next →") {
                             vm.nextQuestion()
                         }
-                        .font(.headline)
+                        .font(Theme.headingFont)
                         .foregroundColor(.black)
                         .padding(.horizontal, 40)
                         .padding(.vertical, 12)
-                        .background(Color(hex: "8b5cf6"))
+                        .background(Theme.accent)
                         .clipShape(Capsule())
                         .transition(.scale)
                     }
@@ -234,12 +209,12 @@ struct QuizView: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Theme.bgCard)
                 )
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
             }
-            } // End if-else
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -248,9 +223,9 @@ struct QuizView: View {
     }
     
     private func optionBackground(_ option: String) -> Color {
-        guard vm.showingFeedback else { return Color.white.opacity(0.1) }
-        if vm.isCorrect(option) { return Color.green.opacity(0.3) }
-        if vm.selectedAnswer == option { return Color.red.opacity(0.3) }
+        guard vm.showingFeedback else { return Theme.bgCard }
+        if vm.isCorrect(option) { return Theme.correct.opacity(0.3) }
+        if vm.selectedAnswer == option { return Theme.incorrect.opacity(0.3) }
         return Color.white.opacity(0.05)
     }
 }

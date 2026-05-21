@@ -13,14 +13,18 @@
 | File | Purpose |
 |------|---------|
 | `BrainStructure.swift` | JSON decoding (`AtlasEntry`) + domain model (`BrainStructure`) |
-| `AtlasLoader.swift` | Parses `atlasStructure.json`, builds hierarchy, `ModelCache` for OBJ loading |
+| `AtlasLoader.swift` | Parses `atlasStructure.json`, builds hierarchy, `ModelCache` for OBJ loading. Cached after first parse. |
+| `Theme.swift` | Design tokens: monochrome + brain-pink palette, New York serif typography, haptic helpers, `PressableStyle`, `Color(hex:)` + `Color.fromRGB` extensions |
+| `SceneUtilities.swift` | Shared `SCNNode` extensions: `applyColor`, `applyTransparency`, `installClipShader`, `updateClipUniforms`, `updateDiffuseColor` |
+| `OBJMeshParser.swift` | Raw OBJ mesh parsing + MRI slice visibility scoring for quiz target selection |
+| `MiniBrainBuilder.swift` | Shared mini-brain scene construction (gray translucent brain + slice plane + camera/lights) |
 | `SceneKitView.swift` | `UIViewRepresentable` wrapping `SCNView` — camera/lights via `ensureSceneSetup` |
-| `MainMenuView.swift` | 3-mode menu with dark gradient design |
-| `QuizView.swift` | Quiz mode — random structure quiz with ghost brain overlay |
-| `ExploreView.swift` | Explore mode — all structures, search, tap-select, explode slider |
-| `MRIView.swift` | MRI mode — 2D slice rendering with 4-color palette + mini-brain |
-| `MRIQuizView.swift` | MRI quiz — identify structures from 2D MRI slices |
-| `ContentView.swift` | Entry point → `MainMenuView` |
+| `MainMenuView.swift` | 4-mode menu with staggered animations, `PressableStyle`, data-driven cards |
+| `QuizView.swift` | Quiz mode — random structure quiz with ghost brain overlay + haptics |
+| `ExploreView.swift` | Explore mode — all structures, search, tap-select with animated transitions, explode slider |
+| `MRIView.swift` | MRI mode — 2D slice rendering with uniform-based clip shaders + mini-brain |
+| `MRIQuizView.swift` | MRI quiz — identify structures from 2D MRI slices with pulsing highlight |
+| `CortiQuizSwiftApp.swift` | Entry point → `MainMenuView` |
 
 ## Data
 - 359 OBJ models in `BrainModels/` (converted from VTK)
@@ -72,3 +76,38 @@
 - **MRI Quiz Dimmed Regions (2026-03-14)**: Non-target regions rendered at 20% brightness / 40% alpha for muted appearance. Target continues pulsing white↔black.
 - **MRI Quiz Flash Removed (2026-03-14)**: Removed `wrongFlash` state and `triggerWrongFlash()` animation. Wrong answers show static red background with ✕ icon.
 - **MRI Quiz Mini-Brain Feedback (2026-03-14)**: After answering, correct region turns green `(0.2,0.9,0.3)` and wrong pick turns red `(0.9,0.2,0.2)` on mini-brain. Mini-brain nodes now named by structure ID. Reset to gray on next question.
+
+## De-Vibecoding Refactor (2026-05-21)
+- **Design System (`Theme.swift`)**: Centralized all colors, typography, and haptics. Monochrome palette (near-black backgrounds, white text) with dusty brain-pink accent `#D4829A`. New York serif (`.design(.serif)`) for headings — gives academic/medical feel without custom fonts. Eliminated all Tailwind CSS hex colors (`fbbf24`, `8b5cf6`, `06b6d4`, `10b981`).
+- **Shared `SCNNode` Extensions (`SceneUtilities.swift`)**: Consolidated 4 duplicated `applyColor`/`applyMaterial`/`applyTransparency` implementations into single `SCNNode` extensions. Added uniform-based MRI clip shader (`installClipShader` + `updateClipUniforms`) to eliminate shader recompilation on every slider drag.
+- **OBJ Mesh Parser Extraction (`OBJMeshParser.swift`)**: Moved ~200 lines of raw OBJ parsing, slice footprint calculation, and quiz target classification out of `MRIQuizView.swift`. Renamed `MRIQuiz`-prefixed structs to clean names (`OBJVertex`, `SliceFootprint`, `TargetCandidate`, etc.).
+- **Mini-Brain Builder (`MiniBrainBuilder.swift`)**: Extracted ~40 lines of duplicated mini-brain scene setup (camera, lights, slice plane, gray material) shared between `MRIView` and `MRIQuizView`.
+- **Atlas Caching**: `AtlasLoader` changed from `class` to `enum`, added `DispatchQueue`-guarded cache. 379KB JSON now parsed once per app session instead of 4 times.
+- **MainMenuView Redesign**: Data-driven mode cards with staggered spring animations (`0.08s` delay per card). `PressableStyle` button style for tactile press feedback. `appear` resets on disappear for animation replay. Icons tinted with `Theme.accent`.
+- **Haptic Feedback**: Added `UIImpactFeedbackGenerator(.light)` on all taps, `UINotificationFeedbackGenerator` `.success`/`.error` on quiz answers across all modes.
+- **SCNTransaction Animation**: Explore mode selection/deselection now animated with 0.25s `SCNTransaction` instead of instant color snap.
+- **Dead Code Removal**: Deleted `isCorticalStructure` (superseded), `focusOn(node:)` (never called), `smallRegionStudyList` (never displayed), `ContentView.swift` (vestigial indirection). All archived to scratch/.
+- **MRIQuizView Slimmed**: 698 → 330 lines. All parsing, classification, and material helpers extracted to shared files.
+- **Build**: Clean build, 0 errors, 0 warnings (iPhone 17 Pro Simulator, iOS 26.2).
+
+## App Icon & App Store Connect Fixes (2026-05-21)
+- **Master Icon Art**: Generated a premium, full-bleed 1024x1024 master app icon with a detailed glowing pink 3D brain model on a deep dark gradient. Natively converted to strict PNG format using macOS `sips`.
+- **Scaling & Formats**: Generated all 18 standard iOS app icon sizes using native `sips` resizing to resolve missing `120x120` (iPhone) and `152x152` (iPad) icon issues on App Store Connect.
+- **Asset Catalog (`Contents.json`)**: Configured the complete set of assets across all idioms and scales.
+- **Verification**: Ran `xcodebuild` clean/build successfully. Verified that `CFBundleIconName` => `AppIcon` is correctly synthesized in the compiled app bundle `Info.plist` and correct icon asset resources are embedded.
+
+## View Orientation & Perspective Fixes (2026-05-21)
+- **Fisheye Distortion Fix**: Reduced `SceneKitView` camera `fieldOfView` from 55 to 30. A wide FOV of 55 caused significant edge stretching (fisheye effect) when objects moved outward radially from the center during the "Explode" interaction in `ExploreView`.
+- **Default Camera Angle**: Moved default camera position from a flat left-lateral profile `(300, 0, 40)` to a natural anterior-oblique view `(200, 400, 150)`. This looks at the brain from the front-right-top, making the 3D structures instantly recognizable rather than "pointed in weird ways." Up vector remains Z `(0, 0, 1)`.
+
+## MRI Multi-Axis Support (2026-05-21)
+- **Coronal & Sagittal Views**: Upgraded `MRIView.swift` to support three dimensions: Axial (Z), Coronal (Y), and Sagittal (X). A new segmented `Picker` lets users select the desired slicing axis. The 2D slice image seamlessly updates.
+- **View-Space Clipping Architecture**: The MRI fragment shader was verified to work universally for all axes without modification. By altering the `SCNRenderer` camera's position to face the origin along the active axis, `_surface.position.z` natively maps to depth along that axis.
+- **Dynamic Mini-Brain Updates**: `MiniBrainBuilder.swift` now calculates and returns multi-axis 3D bounds. In `MRIView`, the semi-transparent pink `slicePlaneNode` dynamically reorients (`eulerAngles`) and positions itself to visualize the current cutting plane relative to the full brain volume.
+
+## Swift 6 Concurrency & Actor Isolation Fixes (2026-05-21)
+- **Nested Structs Actor Isolation**: Under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, nested structs in a type inherit the type's default actor isolation. `MiniBrainBuilder.Bounds` and `MiniBrainBuilder.Result` were implicitly isolated to `@MainActor`, preventing their initializers and properties (like `maxExtent`) from being accessed from nonisolated concurrent contexts (e.g. `Task.detached` blocks in both `MRIViewModel` and `MRIQuizViewModel`).
+- **Nonisolated Struct Refactor**: Defined `MiniBrainBounds` and `MiniBrainResult` as root-level `nonisolated` structs. Exposed them as typealiases (`Bounds` and `Result`) inside `MiniBrainBuilder` to preserve backwards compatibility without modifying any reference sites.
+- **Verification**: Ran clean compilation and successfully passed 3 subsequent build checks.
+
+

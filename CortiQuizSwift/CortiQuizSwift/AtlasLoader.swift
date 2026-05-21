@@ -5,9 +5,14 @@ import SceneKit.ModelIO
 
 // MARK: - Atlas Loader
 
-nonisolated final class AtlasLoader {
+nonisolated enum AtlasLoader {
+    
+    private static var cached: [BrainStructure]?
+    private static let cacheQueue = DispatchQueue(label: "atlascache")
     
     static func load() -> [BrainStructure] {
+        if let hit = cacheQueue.sync(execute: { cached }) { return hit }
+        
         guard let url = Bundle.main.url(forResource: "atlasStructure", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let entries = try? JSONDecoder().decode([AtlasEntry].self, from: data)
@@ -71,6 +76,7 @@ nonisolated final class AtlasLoader {
             structures[i].hierarchyPath = path
         }
         
+        cacheQueue.sync { cached = structures }
         return structures
     }
 }
@@ -109,7 +115,7 @@ nonisolated final class ModelCache: @unchecked Sendable {
             clone.geometry = geom.copy() as? SCNGeometry
             clone.geometry?.materials = geom.materials.map { $0.copy() as! SCNMaterial }
         }
-        for (i, child) in clone.childNodes.enumerated() {
+        for child in clone.childNodes {
             let deepChild = deepClone(child)
             clone.replaceChildNode(child, with: deepChild)
         }

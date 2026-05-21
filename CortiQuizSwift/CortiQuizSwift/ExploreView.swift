@@ -22,8 +22,7 @@ final class ExploreViewModel {
     var searchResults: [BrainStructure] {
         guard !searchQuery.isEmpty else { return [] }
         let q = searchQuery.lowercased()
-        return brainStructures.filter { $0.name.lowercased().contains(q) }
-            .prefix(10).map { $0 }
+        return Array(brainStructures.filter { $0.name.lowercased().contains(q) }.prefix(10))
     }
     
     func setup() {
@@ -43,8 +42,7 @@ final class ExploreViewModel {
             
             for s in brainOnly {
                 guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
-                let uiColor = UIColor(s.color)
-                Self.applyColor(to: node, color: uiColor)
+                node.applyColor(UIColor(s.color))
                 node.name = s.id
                 newScene.rootNode.addChildNode(node)
                 nodes[s.id] = node
@@ -78,17 +76,21 @@ final class ExploreViewModel {
     }
     
     func select(_ structure: BrainStructure) {
+        Theme.tapHaptic()
         selectedStructure = structure
         
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.25
         for (id, node) in structureNodes {
             if id == structure.id {
-                Self.applyColor(to: node, color: UIColor.systemGreen)
+                node.applyColor(UIColor.systemGreen)
                 node.opacity = 1.0
             } else {
-                Self.applyColor(to: node, color: UIColor(white: 0.5, alpha: 1.0))
+                node.applyColor(UIColor(white: 0.5, alpha: 1.0))
                 node.opacity = 0.15
             }
         }
+        SCNTransaction.commit()
     }
     
     func selectByID(_ id: String) {
@@ -99,12 +101,15 @@ final class ExploreViewModel {
     
     func clearSelection() {
         selectedStructure = nil
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.25
         for (id, node) in structureNodes {
             if let s = brainStructures.first(where: { $0.id == id }) {
-                Self.applyColor(to: node, color: UIColor(s.color))
+                node.applyColor(UIColor(s.color))
                 node.opacity = 1.0
             }
         }
+        SCNTransaction.commit()
     }
     
     func updateExplode() {
@@ -116,16 +121,6 @@ final class ExploreViewModel {
             let dz = (orig.z - brainCenter.z) * factor
             node.position = SCNVector3(dx, dy, dz)
         }
-    }
-    
-    private nonisolated static func applyColor(to node: SCNNode, color: UIColor) {
-        if let geom = node.geometry {
-            for mat in geom.materials {
-                mat.diffuse.contents = color
-                mat.isDoubleSided = true
-            }
-        }
-        for child in node.childNodes { applyColor(to: child, color: color) }
     }
     
     func resetForReentry() {
@@ -148,10 +143,9 @@ struct ExploreView: View {
                         .tint(.white)
                         .scaleEffect(1.5)
                     Text("Loading brain atlas…")
-                        .foregroundColor(.gray)
+                        .foregroundColor(Theme.textSecondary)
                 }
             } else {
-                // 3D View
                 ZStack(alignment: .bottomTrailing) {
                     SceneKitView(scene: vm.scene, onTap: { hit in
                         if let name = hit.node.name {
@@ -175,19 +169,17 @@ struct ExploreView: View {
                     .padding(12)
                 }
                 
-                // Overlays
                 VStack {
-                    // Search bar
                     HStack {
                         HStack {
                             Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
+                                .foregroundColor(Theme.textSecondary)
                             TextField("Search structures…", text: $vm.searchQuery)
                                 .foregroundColor(.white)
                                 .autocorrectionDisabled()
                         }
                         .padding(10)
-                        .background(Color.white.opacity(0.12))
+                        .background(Theme.bgInput)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         
                         if vm.selectedStructure != nil {
@@ -195,14 +187,13 @@ struct ExploreView: View {
                                 vm.clearSelection()
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(Theme.textSecondary)
                             }
                         }
                     }
                     .padding(.horizontal)
                     .padding(.top, 4)
                     
-                    // Search results dropdown
                     if !vm.searchResults.isEmpty {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 0) {
@@ -212,54 +203,52 @@ struct ExploreView: View {
                                         vm.searchQuery = ""
                                     } label: {
                                         Text(s.name)
-                                            .font(.subheadline)
+                                            .font(Theme.bodyFont)
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
-                                    Divider().background(Color.white.opacity(0.1))
+                                    Divider().background(Theme.divider)
                                 }
                             }
                         }
                         .frame(maxHeight: 200)
-                        .background(Color(hex: "1a1a2e").opacity(0.95))
+                        .background(Theme.bgSecondary.opacity(0.95))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .padding(.horizontal)
                     }
                     
                     Spacer()
                     
-                    // Controls (explode slider)
                     HStack {
                         Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .foregroundColor(.gray)
-                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .font(Theme.captionFont)
                         Slider(value: Binding(
                             get: { vm.explodeFactor },
                             set: { vm.explodeFactor = $0; vm.updateExplode() }
                         ), in: 0...3)
-                        .tint(Color(hex: "06b6d4"))
+                        .tint(Theme.accent)
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .foregroundColor(.gray)
-                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                            .font(Theme.captionFont)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.08))
+                    .background(Theme.bgCard)
                     .clipShape(Capsule())
                     .padding(.horizontal, 40)
                     
-                    // Info card
                     if let s = vm.selectedStructure {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(s.name)
-                                .font(.headline)
-                                .foregroundColor(.white)
+                                .font(Theme.headingFont)
+                                .foregroundColor(Theme.textPrimary)
                             if !s.hierarchyPath.isEmpty {
                                 Text(s.hierarchyPath.joined(separator: " → ") + " → " + s.name)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .font(Theme.captionFont)
+                                    .foregroundColor(Theme.textSecondary)
                                     .lineLimit(2)
                             }
                         }
@@ -267,10 +256,10 @@ struct ExploreView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.1))
+                                .fill(Theme.bgCard)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                        .stroke(Theme.bgCardStroke, lineWidth: 1)
                                 )
                         )
                         .padding(.horizontal)

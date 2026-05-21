@@ -2,90 +2,71 @@ import SwiftUI
 
 struct MainMenuView: View {
     @State private var appear = false
-    
+
+    private struct ModeInfo: Identifiable {
+        let id = UUID()
+        let icon: String
+        let title: String
+        let subtitle: String
+        let destination: AnyView
+    }
+
+    private var modes: [ModeInfo] {
+        [
+            ModeInfo(icon: "brain.head.profile", title: "Normal Mode",
+                     subtitle: "Identify brain structures", destination: AnyView(QuizView())),
+            ModeInfo(icon: "cube.transparent", title: "Explore Mode",
+                     subtitle: "Browse the full brain atlas", destination: AnyView(ExploreView())),
+            ModeInfo(icon: "waveform.path.ecg", title: "MRI Mode",
+                     subtitle: "Dynamic brain cross-sections", destination: AnyView(MRIView())),
+            ModeInfo(icon: "brain.filled.head.profile", title: "MRI Quiz",
+                     subtitle: "Identify structures from slices", destination: AnyView(MRIQuizView())),
+        ]
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                LinearGradient(
-                    colors: [Color(hex: "0a0a0a"), Color(hex: "151515")],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                
+                LinearGradient(colors: [Theme.bgPrimary, Theme.bgSecondary],
+                               startPoint: .top, endPoint: .bottom)
+                    .ignoresSafeArea()
+
                 VStack(spacing: 32) {
                     Spacer()
-                    
-                    // Title
+
                     VStack(spacing: 8) {
                         Text("CortiQuiz")
-                            .font(.system(size: 42, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .font(Theme.displayFont)
+                            .foregroundStyle(Theme.textPrimary)
                         Text("Brain Anatomy Trainer")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .font(Theme.captionFont)
+                            .foregroundStyle(Theme.textSecondary)
                     }
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : -20)
-                    
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: appear)
+
                     Spacer()
-                    
-                    // Mode Cards
+
                     VStack(spacing: 16) {
-                        NavigationLink(destination: QuizView()) {
-                            ModeCard(
-                                icon: "brain.head.profile",
-                                title: "Normal Mode",
-                                subtitle: "Identify brain structures",
-                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
-                            )
+                        ForEach(Array(modes.enumerated()), id: \.element.id) { index, mode in
+                            NavigationLink(destination: mode.destination) {
+                                ModeCard(icon: mode.icon, title: mode.title, subtitle: mode.subtitle)
+                            }
+                            .buttonStyle(PressableStyle())
+                            .opacity(appear ? 1 : 0)
+                            .offset(y: appear ? 0 : 30)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.8)
+                                .delay(Double(index) * 0.08), value: appear)
                         }
-                        .opacity(appear ? 1 : 0)
-                        .offset(y: appear ? 0 : 30)
-                        
-                        NavigationLink(destination: ExploreView()) {
-                            ModeCard(
-                                icon: "cube.transparent",
-                                title: "Explore Mode",
-                                subtitle: "Browse the full brain atlas",
-                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
-                            )
-                        }
-                        .opacity(appear ? 1 : 0)
-                        .offset(y: appear ? 0 : 30)
-                        
-                        NavigationLink(destination: MRIView()) {
-                            ModeCard(
-                                icon: "waveform.path.ecg",
-                                title: "MRI Mode",
-                                subtitle: "Dynamic brain cross-sections",
-                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
-                            )
-                        }
-                        .opacity(appear ? 1 : 0)
-                        .offset(y: appear ? 0 : 30)
-                        
-                        NavigationLink(destination: MRIQuizView()) {
-                            ModeCard(
-                                icon: "brain.filled.head.profile",
-                                title: "MRI Quiz",
-                                subtitle: "Identify structures from slices",
-                                gradient: [Color(hex: "404040"), Color(hex: "2a2a2a")]
-                            )
-                        }
-                        .opacity(appear ? 1 : 0)
-                        .offset(y: appear ? 0 : 30)
                     }
                     .padding(.horizontal)
-                    
+
                     Spacer()
                 }
             }
-            .onAppear {
-                withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
-                    appear = true
-                }
-            }
+            .onAppear { appear = true }
+            .onDisappear { appear = false }
         }
         .tint(.white)
     }
@@ -93,60 +74,42 @@ struct MainMenuView: View {
 
 // MARK: - Mode Card
 
-struct ModeCard: View {
+private struct ModeCard: View {
     let icon: String
     let title: String
     let subtitle: String
-    let gradient: [Color]
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title)
-                .foregroundColor(.white)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 50, height: 50)
-                .background(
-                    LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
-                )
+                .background(Theme.bgCard)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(Theme.headingFont)
+                    .foregroundStyle(Theme.textPrimary)
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(Theme.captionFont)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            
+
             Spacer()
-            
+
             Image(systemName: "chevron.right")
-                .foregroundColor(.gray)
+                .foregroundStyle(Theme.textTertiary)
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.08))
+                .fill(Theme.bgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        .stroke(Theme.bgCardStroke, lineWidth: 1)
                 )
         )
-    }
-}
-
-// MARK: - Hex Color
-
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: .alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let r, g, b: Double
-        r = Double((int >> 16) & 0xFF) / 255
-        g = Double((int >> 8) & 0xFF) / 255
-        b = Double(int & 0xFF) / 255
-        self.init(red: r, green: g, blue: b)
     }
 }

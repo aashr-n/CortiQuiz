@@ -91,32 +91,7 @@ nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
         return true
     }
     
-    /// Only cortical structures for quiz mode
-    var isCorticalStructure: Bool {
-        let n = name.lowercased()
-        let cortexKeywords = ["gyrus", "sulcus", "pole", "lobule", "cuneus", "precuneus",
-                              "insula", "limen", "opercul", "visual cortex"]
-        return cortexKeywords.contains { n.contains($0) }
-    }
-    
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: BrainStructure, rhs: BrainStructure) -> Bool { lhs.id == rhs.id }
 }
 
-// MARK: - Color Parsing
-
-extension Color {
-    nonisolated static func fromRGB(_ str: String?) -> Color {
-        guard let str = str,
-              str.hasPrefix("rgb("),
-              str.hasSuffix(")")
-        else { return .gray }
-        let inner = String(str.dropFirst(4).dropLast()).split(separator: ",")
-        guard inner.count == 3,
-              let r = Double(inner[0].trimmingCharacters(in: .whitespaces)),
-              let g = Double(inner[1].trimmingCharacters(in: .whitespaces)),
-              let b = Double(inner[2].trimmingCharacters(in: .whitespaces))
-        else { return .gray }
-        return Color(red: r / 255, green: g / 255, blue: b / 255)
-    }
-}

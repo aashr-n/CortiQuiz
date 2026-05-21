@@ -50,13 +50,13 @@ struct SceneKitView: UIViewRepresentable {
         guard scene.rootNode.childNode(withName: "mainCamera", recursively: false) == nil else { return }
         
         let camera = SCNCamera()
-        camera.fieldOfView = 55
+        camera.fieldOfView = 30
         camera.zNear = 1
         camera.zFar = 2000
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        // Left-lateral view: camera from +X looking along -X, Z-up
-        cameraNode.position = SCNVector3(300, 0, 40)
+        // Anterior-oblique view: camera from front-right-top (+X, +Y, +Z)
+        cameraNode.position = SCNVector3(200, 400, 150)
         cameraNode.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         cameraNode.name = "mainCamera"
         scene.rootNode.addChildNode(cameraNode)
@@ -89,7 +89,7 @@ struct SceneKitView: UIViewRepresentable {
         guard let camera = view.scene?.rootNode.childNode(withName: "mainCamera", recursively: true) else { return }
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.5
-        camera.position = SCNVector3(300, 0, 40)
+        camera.position = SCNVector3(200, 400, 150)
         camera.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         SCNTransaction.commit()
     }
@@ -114,25 +114,3 @@ struct SceneKitView: UIViewRepresentable {
     }
 }
 
-// MARK: - Helper: Focus camera on a node
-
-extension SCNView {
-    func focusOn(node: SCNNode, duration: TimeInterval = 0.5) {
-        let (bmin, bmax) = node.boundingBox
-        let center = SCNVector3(
-            (bmin.x + bmax.x) / 2,
-            (bmin.y + bmax.y) / 2,
-            (bmin.z + bmax.z) / 2
-        )
-        let size = Swift.max(bmax.x - bmin.x, Swift.max(bmax.y - bmin.y, bmax.z - bmin.z))
-        let distance = Float(size) * 2.5
-        
-        if let camera = scene?.rootNode.childNode(withName: "mainCamera", recursively: true) {
-            SCNTransaction.begin()
-            SCNTransaction.animationDuration = duration
-            camera.position = SCNVector3(center.x + distance, center.y, center.z)
-            camera.look(at: center, up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
-            SCNTransaction.commit()
-        }
-    }
-}
