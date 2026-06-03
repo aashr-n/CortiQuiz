@@ -25,7 +25,9 @@ struct SceneKitView: UIViewRepresentable {
         }
         
         view.scene = scene
-        Self.ensureSceneSetup(scene)
+        let frame = Self.ensureSceneSetup(scene)
+        view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
+        view.defaultCameraController.target = frame.center
         context.coordinator.lastRecenter = recenterTrigger
         return view
     }
@@ -33,7 +35,9 @@ struct SceneKitView: UIViewRepresentable {
     func updateUIView(_ view: SCNView, context: Context) {
         if view.scene !== scene {
             view.scene = scene
-            Self.ensureSceneSetup(scene)
+            let frame = Self.ensureSceneSetup(scene)
+            view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
+            view.defaultCameraController.target = frame.center
         }
         view.allowsCameraControl = allowsCameraControl
         
@@ -46,20 +50,18 @@ struct SceneKitView: UIViewRepresentable {
     
     /// Camera facing anterior (along -Y) with superior (Z) as up.
     /// This orients the brain right-side-up for RAS coordinate models.
-    private static func ensureSceneSetup(_ scene: SCNScene) {
-        guard scene.rootNode.childNode(withName: "mainCamera", recursively: false) == nil else { return }
-        
+    @discardableResult
+    private static func ensureSceneSetup(_ scene: SCNScene) -> CameraFrame {
+        if let existingCamera = scene.rootNode.childNode(withName: "mainCamera", recursively: false) {
+            return configureCamera(existingCamera, in: scene)
+        }
+
         let camera = SCNCamera()
-        camera.fieldOfView = 30
-        camera.zNear = 1
-        camera.zFar = 2000
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        // Anterior-oblique view: camera from front-right-top (+X, +Y, +Z)
-        cameraNode.position = SCNVector3(200, 400, 150)
-        cameraNode.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
         cameraNode.name = "mainCamera"
         scene.rootNode.addChildNode(cameraNode)
+        let frame = configureCamera(cameraNode, in: scene)
         
         // Lighting
         let ambient = SCNNode()
@@ -83,15 +85,135 @@ struct SceneKitView: UIViewRepresentable {
         directional2.light?.intensity = 400
         directional2.eulerAngles = SCNVector3(Float.pi / 4, -Float.pi / 4, 0)
         scene.rootNode.addChildNode(directional2)
+
+        return frame
     }
     
     private func recenterCamera(in view: SCNView) {
-        guard let camera = view.scene?.rootNode.childNode(withName: "mainCamera", recursively: true) else { return }
+        guard let scene = view.scene,
+              let camera = scene.rootNode.childNode(withName: "mainCamera", recursively: true)
+        else { return }
+        let frame = Self.cameraFrame(for: scene)
         SCNTransaction.begin()
         SCNTransaction.animationDuration = 0.5
-        camera.position = SCNVector3(200, 400, 150)
-        camera.look(at: SCNVector3(0, 0, 10), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
+        Self.apply(frame, to: camera)
         SCNTransaction.commit()
+        view.defaultCameraController.target = frame.center
+    }
+
+    private struct CameraFrame {
+        let center: SCNVector3
+        let position: SCNVector3
+        let radius: Float
+    }
+
+    private struct SceneBounds {
+        let minPoint: SCNVector3
+        let maxPoint: SCNVector3
+
+        var center: SCNVector3 {
+            SCNVector3(
+                (minPoint.x + maxPoint.x) / 2,
+                (minPoint.y + maxPoint.y) / 2,
+                (minPoint.z + maxPoint.z) / 2
+            )
+        }
+
+        var radius: Float {
+            let dx = maxPoint.x - minPoint.x
+            let dy = maxPoint.y - minPoint.y
+            let dz = maxPoint.z - minPoint.z
+            return max(sqrt(dx * dx + dy * dy + dz * dz) / 2, 1)
+        }
+    }
+
+    private static func configureCamera(_ cameraNode: SCNNode, in scene: SCNScene) -> CameraFrame {
+        let frame = cameraFrame(for: scene)
+        let camera = cameraNode.camera ?? SCNCamera()
+        camera.fieldOfView = 30
+        camera.zNear = 1
+        camera.zFar = Double(max(2000, frame.radius * 8))
+        cameraNode.camera = camera
+        apply(frame, to: cameraNode)
+        return frame
+    }
+
+    private static func apply(_ frame: CameraFrame, to cameraNode: SCNNode) {
+        cameraNode.position = frame.position
+        cameraNode.look(
+            at: frame.center,
+            up: SCNVector3(0, 0, 1),
+            localFront: SCNVector3(0, 0, -1)
+        )
+    }
+
+    private static func cameraFrame(for scene: SCNScene) -> CameraFrame {
+        let bounds = sceneContentBounds(scene)
+        let center = bounds?.center ?? SCNVector3(0, 0, 10)
+        let radius = bounds?.radius ?? 110
+        let viewDirection = normalized(SCNVector3(0.42, 0.84, 0.32))
+        let fieldOfView = Float(30.0 * Double.pi / 180.0)
+        let distance = max(radius / sin(fieldOfView / 2) * 1.18, 280)
+        let position = SCNVector3(
+            center.x + viewDirection.x * distance,
+            center.y + viewDirection.y * distance,
+            center.z + viewDirection.z * distance
+        )
+
+        return CameraFrame(center: center, position: position, radius: radius)
+    }
+
+    private static func sceneContentBounds(_ scene: SCNScene) -> SceneBounds? {
+        var minPoint = SCNVector3(
+            Float.greatestFiniteMagnitude,
+            Float.greatestFiniteMagnitude,
+            Float.greatestFiniteMagnitude
+        )
+        var maxPoint = SCNVector3(
+            -Float.greatestFiniteMagnitude,
+            -Float.greatestFiniteMagnitude,
+            -Float.greatestFiniteMagnitude
+        )
+        var foundGeometry = false
+
+        scene.rootNode.enumerateChildNodes { node, _ in
+            guard node.camera == nil, node.light == nil, node.geometry != nil else { return }
+            let (localMin, localMax) = node.boundingBox
+            guard localMin.x.isFinite, localMin.y.isFinite, localMin.z.isFinite,
+                  localMax.x.isFinite, localMax.y.isFinite, localMax.z.isFinite,
+                  localMin.x <= localMax.x, localMin.y <= localMax.y, localMin.z <= localMax.z
+            else { return }
+
+            let corners = [
+                SCNVector3(localMin.x, localMin.y, localMin.z),
+                SCNVector3(localMin.x, localMin.y, localMax.z),
+                SCNVector3(localMin.x, localMax.y, localMin.z),
+                SCNVector3(localMin.x, localMax.y, localMax.z),
+                SCNVector3(localMax.x, localMin.y, localMin.z),
+                SCNVector3(localMax.x, localMin.y, localMax.z),
+                SCNVector3(localMax.x, localMax.y, localMin.z),
+                SCNVector3(localMax.x, localMax.y, localMax.z)
+            ]
+
+            for corner in corners {
+                let point = node.convertPosition(corner, to: nil)
+                minPoint.x = min(minPoint.x, point.x)
+                minPoint.y = min(minPoint.y, point.y)
+                minPoint.z = min(minPoint.z, point.z)
+                maxPoint.x = max(maxPoint.x, point.x)
+                maxPoint.y = max(maxPoint.y, point.y)
+                maxPoint.z = max(maxPoint.z, point.z)
+                foundGeometry = true
+            }
+        }
+
+        guard foundGeometry else { return nil }
+        return SceneBounds(minPoint: minPoint, maxPoint: maxPoint)
+    }
+
+    private static func normalized(_ vector: SCNVector3) -> SCNVector3 {
+        let length = max(sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z), 0.0001)
+        return SCNVector3(vector.x / length, vector.y / length, vector.z / length)
     }
     
     func makeCoordinator() -> Coordinator {
@@ -113,4 +235,3 @@ struct SceneKitView: UIViewRepresentable {
         }
     }
 }
-

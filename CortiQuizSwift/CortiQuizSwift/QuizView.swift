@@ -17,6 +17,11 @@ final class QuizViewModel {
     var scene = SCNScene()
     var isLoading = true
     var recenterTrigger = false
+    var explodeFactor: Float = 0
+    
+    private var structureNodes: [String: SCNNode] = [:]
+    private var originalPositions: [String: SCNVector3] = [:]
+    private var brainCenter = SCNVector3Zero
     private var setupStarted = false
     
     func setup() {
@@ -28,10 +33,42 @@ final class QuizViewModel {
             let loadedAll = AtlasLoader.load()
             let loadedBrainOnly = loadedAll.filter { $0.modelFileName != nil && $0.isBrainStructure && !$0.isGroup }
             
+            let newScene = SCNScene()
+            var nodes: [String: SCNNode] = [:]
+            var positions: [String: SCNVector3] = [:]
+            var totalX: Float = 0, totalY: Float = 0, totalZ: Float = 0
+            var count: Float = 0
+            
+            for s in loadedBrainOnly {
+                guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
+                node.applyColor(UIColor(s.color))
+                node.name = s.id
+                newScene.rootNode.addChildNode(node)
+                nodes[s.id] = node
+                
+                let (min, max) = node.boundingBox
+                let cx = (min.x + max.x) / 2
+                let cy = (min.y + max.y) / 2
+                let cz = (min.z + max.z) / 2
+                positions[s.id] = SCNVector3(cx, cy, cz)
+                totalX += cx; totalY += cy; totalZ += cz
+                count += 1
+            }
+            
+            let center = count > 0
+                ? SCNVector3(totalX / count, totalY / count, totalZ / count)
+                : SCNVector3Zero
+            
+            let finalNodes = nodes
+            let finalPositions = positions
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.allStructures = loadedAll
                 self.brainOnlyStructures = loadedBrainOnly
+                self.scene = newScene
+                self.structureNodes = finalNodes
+                self.originalPositions = finalPositions
+                self.brainCenter = center
                 self.nextQuestion()
             }
         }
@@ -42,7 +79,8 @@ final class QuizViewModel {
         
         selectedAnswer = nil
         showingFeedback = false
-        isLoading = true
+        explodeFactor = 0
+        updateExplode()
         
         guard let target = brainOnlyStructures.randomElement() else { return }
         currentTarget = target
@@ -56,17 +94,10 @@ final class QuizViewModel {
                 optionSet.insert(s.baseName)
             }
         }
-        let generatedOptions = Array(optionSet).shuffled()
+        options = Array(optionSet).shuffled()
         
-        Task.detached { [weak self] in
-            let newScene = Self.buildSceneNode(target: target)
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.options = generatedOptions
-                self.scene = newScene
-                self.isLoading = false
-            }
-        }
+        updateNodeStates()
+        isLoading = false
     }
     
     func answer(_ choice: String) {
@@ -81,30 +112,54 @@ final class QuizViewModel {
         } else {
             Theme.errorHaptic()
         }
+        updateNodeStates()
     }
     
     func isCorrect(_ choice: String) -> Bool { choice == correctAnswer }
     
-    private nonisolated static func buildSceneNode(target: BrainStructure) -> SCNScene {
-        let newScene = SCNScene()
+    func updateExplode() {
+        let factor = explodeFactor
+        for (id, node) in structureNodes {
+            guard let orig = originalPositions[id] else { continue }
+            let dx = (orig.x - brainCenter.x) * factor
+            let dy = (orig.y - brainCenter.y) * factor
+            let dz = (orig.z - brainCenter.z) * factor
+            node.position = SCNVector3(dx, dy, dz)
+        }
+    }
+    
+    func updateNodeStates() {
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.25
         
-        let ghostFiles = ["Model_2_white_matter_of_left_cerebral_hemisphere.obj",
-                          "Model_41_white_matter_of_right_cerebral_hemisphere.obj"]
-        for gf in ghostFiles {
-            if let node = ModelCache.shared.node(for: gf) {
-                node.applyTransparency(alpha: 0.06)
-                newScene.rootNode.addChildNode(node)
+        let feedback = showingFeedback
+        let selectedName = selectedAnswer
+        
+        for (id, node) in structureNodes {
+            guard let s = brainOnlyStructures.first(where: { $0.id == id }) else { continue }
+            
+            if feedback {
+                if s.id == currentTarget?.id {
+                    node.applyColor(UIColor(Theme.correct))
+                    node.opacity = 1.0
+                } else if let sel = selectedName, s.baseName == sel {
+                    node.applyColor(UIColor(Theme.incorrect))
+                    node.opacity = 1.0
+                } else {
+                    node.applyColor(UIColor(s.color))
+                    node.opacity = 0.15
+                }
+            } else {
+                if s.id == currentTarget?.id {
+                    node.applyColor(UIColor.systemCyan)
+                    node.opacity = 1.0
+                } else {
+                    node.applyColor(UIColor(s.color))
+                    node.opacity = 0.15
+                }
             }
         }
-        
-        if let modelFile = target.modelFileName, let node = ModelCache.shared.node(for: modelFile) {
-            let red = UIColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0)
-            node.applyColor(red)
-            node.name = "target"
-            newScene.rootNode.addChildNode(node)
-        }
-        
-        return newScene
+        SCNTransaction.commit()
     }
     
     func resetForReentry() {
@@ -145,19 +200,41 @@ struct QuizView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 
-                ZStack(alignment: .bottomTrailing) {
+                ZStack(alignment: .bottom) {
                     SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
                         .frame(maxHeight: .infinity)
                     
-                    Button {
-                        vm.recenterTrigger.toggle()
-                    } label: {
-                        Image(systemName: "scope")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding(10)
-                            .background(Color.white.opacity(0.15))
-                            .clipShape(Circle())
+                    HStack {
+                        HStack {
+                            Image(systemName: "arrow.down.right.and.arrow.up.left")
+                                .foregroundColor(Theme.textSecondary)
+                                .font(Theme.captionFont)
+                            Slider(value: Binding(
+                                get: { vm.explodeFactor },
+                                set: { vm.explodeFactor = $0; vm.updateExplode() }
+                            ), in: 0...3)
+                            .tint(Theme.accent)
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .foregroundColor(Theme.textSecondary)
+                                .font(Theme.captionFont)
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+                        .background(Theme.bgSecondary.opacity(0.8))
+                        .clipShape(Capsule())
+                        
+                        Spacer()
+                        
+                        Button {
+                            vm.recenterTrigger.toggle()
+                        } label: {
+                            Image(systemName: "scope")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                                .padding(10)
+                                .background(Color.white.opacity(0.15))
+                                .clipShape(Circle())
+                        }
                     }
                     .padding(12)
                 }

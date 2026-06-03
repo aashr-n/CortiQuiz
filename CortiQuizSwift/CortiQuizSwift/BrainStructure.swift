@@ -72,10 +72,17 @@ nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
     
     /// Name without left/right prefix for matching
     var baseName: String {
-        name.replacingOccurrences(of: "left ", with: "")
-            .replacingOccurrences(of: "right ", with: "")
-            .replacingOccurrences(of: "Left ", with: "")
-            .replacingOccurrences(of: "Right ", with: "")
+        name.replacingOccurrences(
+            of: #"\b(left|right)[\s_-]+"#,
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        .replacingOccurrences(
+            of: #"\s+"#,
+            with: " ",
+            options: .regularExpression
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     var isBrainStructure: Bool {
@@ -94,4 +101,3 @@ nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: BrainStructure, rhs: BrainStructure) -> Bool { lhs.id == rhs.id }
 }
-

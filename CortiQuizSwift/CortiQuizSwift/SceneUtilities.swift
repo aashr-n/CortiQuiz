@@ -22,6 +22,7 @@ extension SCNNode {
                 mat.transparency = alpha
                 mat.isDoubleSided = true
                 mat.blendMode = .alpha
+                mat.writesToDepthBuffer = false
             }
         }
         for child in childNodes { child.applyTransparency(alpha: alpha) }

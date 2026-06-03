@@ -1,6 +1,6 @@
 # CortiQuiz — Code Notes
 
-## Project State: ✅ Builds successfully (iOS Simulator, iPhone 17 Pro)
+## Project State: ✅ Builds successfully (iOS Simulator, iPhone 17, iOS 26.5)
 
 ## Architecture
 - **SwiftUI + SceneKit** — pure Apple frameworks, no SPM deps
@@ -109,5 +109,30 @@
 - **Nested Structs Actor Isolation**: Under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, nested structs in a type inherit the type's default actor isolation. `MiniBrainBuilder.Bounds` and `MiniBrainBuilder.Result` were implicitly isolated to `@MainActor`, preventing their initializers and properties (like `maxExtent`) from being accessed from nonisolated concurrent contexts (e.g. `Task.detached` blocks in both `MRIViewModel` and `MRIQuizViewModel`).
 - **Nonisolated Struct Refactor**: Defined `MiniBrainBounds` and `MiniBrainResult` as root-level `nonisolated` structs. Exposed them as typealiases (`Bounds` and `Result`) inside `MiniBrainBuilder` to preserve backwards compatibility without modifying any reference sites.
 - **Verification**: Ran clean compilation and successfully passed 3 subsequent build checks.
+
+## Environment Verification & Build Instructions (2026-06-03)
+- **Xcode Select Path**: `/Applications/Xcode.app/Contents/Developer`
+- **SDK & Runtime**: iOS 26.5 Simulator Runtime (`com.apple.CoreSimulator.SimRuntime.iOS-26-5`)
+- **Preferred Simulator**: iPhone 17 (`46BD4F72-B5C6-4096-885B-6FD11E2E769B`)
+- **Main App Scheme**: `CortiQuizSwift`
+- **Build Command**:
+  ```bash
+  xcodebuild -project CortiQuizSwift/CortiQuizSwift.xcodeproj -scheme CortiQuizSwift -destination 'id=46BD4F72-B5C6-4096-885B-6FD11E2E769B' clean build
+  ```
+- **Install Command**:
+  ```bash
+  xcrun simctl install booted "/Users/aashray/Library/Developer/Xcode/DerivedData/CortiQuizSwift-gougtpmeqwafiofiwgvkhxnadmkk/Build/Products/Debug-iphonesimulator/CortiQuizSwift.app"
+  ```
+- **Launch Command**:
+  ```bash
+  xcrun simctl launch booted com.aashray.CortiQuizSwift
+  ```
+- **Smoke Test Verification**: Successfully completed clean build, installed app to booted simulator, and launched with process ID.
+
+## 3D Quiz Enhancements (2026-06-03)
+- **Full Brain Visualization**: Modified `QuizViewModel` to load the full brain (all `brainOnly` structures) during setup instead of loading a sparse subset of structures.
+- **Dynamic Node State Highlights**: Added `updateNodeStates()` using `SCNNode.opacity`. Target region is colored cyan and set to `1.0` opacity before answering, with all other structures at `0.15` opacity. After answer submission, the correct structure highlights green (`Theme.correct`), and any incorrectly selected structure highlights red (`Theme.incorrect`).
+- **Explode Slider Integration**: Added an explode slider (`explodeFactor` bounding to 3D node translations outward from the calculated brain center) in the quiz view overlay, resetting to `0` on each new question.
+
 
 
