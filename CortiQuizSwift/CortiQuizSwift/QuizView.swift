@@ -23,6 +23,9 @@ final class QuizViewModel {
     private var originalPositions: [String: SCNVector3] = [:]
     private var brainCenter = SCNVector3Zero
     private var setupStarted = false
+    private nonisolated static let backgroundRegionColor = UIColor(white: 0.58, alpha: 1.0)
+    private nonisolated static let backgroundRegionOpacity: CGFloat = 0.16
+    private nonisolated static let targetRegionColor = UIColor.systemCyan
     
     func setup() {
         guard !setupStarted else { return }
@@ -41,7 +44,7 @@ final class QuizViewModel {
             
             for s in loadedBrainOnly {
                 guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
-                node.applyColor(UIColor(s.color))
+                node.applyColor(Self.backgroundRegionColor)
                 node.name = s.id
                 newScene.rootNode.addChildNode(node)
                 nodes[s.id] = node
@@ -146,16 +149,16 @@ final class QuizViewModel {
                     node.applyColor(UIColor(Theme.incorrect))
                     node.opacity = 1.0
                 } else {
-                    node.applyColor(UIColor(s.color))
-                    node.opacity = 0.15
+                    node.applyColor(Self.backgroundRegionColor)
+                    node.opacity = Self.backgroundRegionOpacity
                 }
             } else {
                 if s.id == currentTarget?.id {
-                    node.applyColor(UIColor.systemCyan)
+                    node.applyColor(Self.targetRegionColor)
                     node.opacity = 1.0
                 } else {
-                    node.applyColor(UIColor(s.color))
-                    node.opacity = 0.15
+                    node.applyColor(Self.backgroundRegionColor)
+                    node.opacity = Self.backgroundRegionOpacity
                 }
             }
         }
