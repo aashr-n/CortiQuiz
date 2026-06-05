@@ -25,7 +25,7 @@ final class QuizViewModel {
     private var setupStarted = false
     private nonisolated static let backgroundRegionColor = UIColor(white: 0.58, alpha: 1.0)
     private nonisolated static let backgroundRegionOpacity: CGFloat = 0.16
-    private nonisolated static let targetRegionColor = UIColor.systemCyan
+    private nonisolated static let targetRegionColor = UIColor(red: 0.96, green: 0.24, blue: 0.36, alpha: 1.0)
     
     func setup() {
         guard !setupStarted else { return }
