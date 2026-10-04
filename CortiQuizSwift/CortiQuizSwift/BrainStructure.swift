@@ -69,9 +69,34 @@ nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
     var hierarchyPath: [String]
     let isGroup: Bool
     let memberIDs: [String]
-    
-    /// Name without left/right prefix for matching
-    var baseName: String {
+    /// ID of the immediate parent group, if any. Used to pick anatomically plausible quiz distractors.
+    var parentID: String?
+    /// Name without left/right markers, computed once at init (the regex is hot on quiz paths).
+    let baseName: String
+
+    init(
+        id: String,
+        name: String,
+        color: Color,
+        modelFileName: String?,
+        hierarchyPath: [String],
+        isGroup: Bool,
+        memberIDs: [String],
+        parentID: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.color = color
+        self.modelFileName = modelFileName
+        self.hierarchyPath = hierarchyPath
+        self.isGroup = isGroup
+        self.memberIDs = memberIDs
+        self.parentID = parentID
+        self.baseName = Self.computeBaseName(name)
+    }
+
+    /// Strip left/right markers and collapse whitespace, for matching hemisphere pairs.
+    static func computeBaseName(_ name: String) -> String {
         name.replacingOccurrences(
             of: #"\b(left|right)[\s_-]+"#,
             with: "",
@@ -84,7 +109,7 @@ nonisolated struct BrainStructure: Identifiable, Hashable, Sendable {
         )
         .trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
     var isBrainStructure: Bool {
         guard let fn = modelFileName else { return isGroup }
         // Model_4xxx = muscles/face, Model_3_skin = skin

@@ -67,6 +67,7 @@ nonisolated enum AtlasLoader {
         }
         
         for i in structures.indices {
+            structures[i].parentID = parentMap[structures[i].id]
             var path: [String] = []
             var current = structures[i].id
             while let pid = parentMap[current], let parent = structByID[pid] {

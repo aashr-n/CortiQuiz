@@ -26,13 +26,14 @@ enum Theme {
     static let incorrect = Color(red: 0.90, green: 0.30, blue: 0.30)
     static let scoreGold = Color(red: 0.95, green: 0.77, blue: 0.20)
 
-    // MARK: Typography — New York serif for headings, SF Pro for body
-    static let displayFont: Font = .system(size: 42, weight: .bold, design: .serif)
-    static let titleFont: Font = .system(size: 20, weight: .semibold, design: .serif)
-    static let headingFont: Font = .system(size: 17, weight: .semibold, design: .serif)
-    static let bodyFont: Font = .system(size: 15, weight: .regular, design: .default)
-    static let captionFont: Font = .system(size: 12, weight: .regular, design: .default)
-    static let monoFont: Font = .system(size: 13, weight: .medium, design: .monospaced)
+    // MARK: Typography — New York serif for headings, SF Pro for body.
+    // Built on text styles so they scale with Dynamic Type / accessibility text sizes.
+    static let displayFont: Font = .system(.largeTitle, design: .serif).weight(.bold)
+    static let titleFont: Font = .system(.title2, design: .serif).weight(.semibold)
+    static let headingFont: Font = .system(.headline, design: .serif)
+    static let bodyFont: Font = .system(.subheadline)
+    static let captionFont: Font = .system(.caption)
+    static let monoFont: Font = .system(.footnote, design: .monospaced).weight(.medium)
 
     // MARK: Haptics
     static func tapHaptic() {

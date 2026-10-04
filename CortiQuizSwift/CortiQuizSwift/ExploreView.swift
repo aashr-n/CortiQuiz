@@ -29,47 +29,20 @@ final class ExploreViewModel {
         guard !setupStarted else { return }
         setupStarted = true
         isLoading = true
-        
+
         Task.detached { [weak self] in
-            let loaded = AtlasLoader.load()
-            let brainOnly = loaded.filter { $0.modelFileName != nil && $0.isBrainStructure && !$0.isGroup }
-            let newScene = SCNScene()
-            
-            var nodes: [String: SCNNode] = [:]
-            var positions: [String: SCNVector3] = [:]
-            var totalX: Float = 0, totalY: Float = 0, totalZ: Float = 0
-            var count: Float = 0
-            
-            for s in brainOnly {
-                guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
+            let loaded = BrainSceneLoader.load { node, s in
                 node.applyColor(UIColor(s.color))
-                node.name = s.id
-                newScene.rootNode.addChildNode(node)
-                nodes[s.id] = node
-                
-                let (min, max) = node.boundingBox
-                let cx = (min.x + max.x) / 2
-                let cy = (min.y + max.y) / 2
-                let cz = (min.z + max.z) / 2
-                positions[s.id] = SCNVector3(cx, cy, cz)
-                totalX += cx; totalY += cy; totalZ += cz
-                count += 1
             }
-            
-            let center = count > 0
-                ? SCNVector3(totalX / count, totalY / count, totalZ / count)
-                : SCNVector3Zero
-            
-            let finalNodes = nodes
-            let finalPositions = positions
+
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                self.allStructures = loaded
-                self.brainStructures = brainOnly
-                self.scene = newScene
-                self.structureNodes = finalNodes
-                self.originalPositions = finalPositions
-                self.brainCenter = center
+                self.allStructures = loaded.allStructures
+                self.brainStructures = loaded.structures
+                self.scene = loaded.scene
+                self.structureNodes = loaded.nodes
+                self.originalPositions = loaded.nodeCenters
+                self.brainCenter = loaded.center
                 self.isLoading = false
             }
         }
@@ -155,7 +128,8 @@ struct ExploreView: View {
                         }
                     }, recenterTrigger: vm.recenterTrigger)
                     .ignoresSafeArea(edges: .bottom)
-                    
+                    .accessibilityLabel("3D brain atlas. Tap a structure to select it.")
+
                     Button {
                         vm.recenterTrigger.toggle()
                     } label: {
@@ -166,6 +140,7 @@ struct ExploreView: View {
                             .background(Color.white.opacity(0.15))
                             .clipShape(Circle())
                     }
+                    .accessibilityLabel("Recenter camera")
                     .padding(12)
                 }
                 
@@ -230,6 +205,7 @@ struct ExploreView: View {
                             set: { vm.explodeFactor = $0; vm.updateExplode() }
                         ), in: 0...3)
                         .tint(Theme.accent)
+                        .accessibilityLabel("Explode view")
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .foregroundColor(Theme.textSecondary)
                             .font(Theme.captionFont)

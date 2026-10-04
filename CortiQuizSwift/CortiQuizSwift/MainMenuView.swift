@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainMenuView: View {
     @State private var appear = false
+    private let store = ProgressStore.shared
 
     private struct ModeInfo: Identifiable {
         let id = UUID()
@@ -13,6 +14,8 @@ struct MainMenuView: View {
 
     private var modes: [ModeInfo] {
         [
+            ModeInfo(icon: "graduationcap.fill", title: "Learn Mode",
+                     subtitle: "Flashcards — study with no pressure", destination: AnyView(LearnView())),
             ModeInfo(icon: "brain.head.profile", title: "Normal Mode",
                      subtitle: "Identify brain structures", destination: AnyView(QuizView())),
             ModeInfo(icon: "cube.transparent", title: "Explore Mode",
@@ -63,12 +66,34 @@ struct MainMenuView: View {
                     .padding(.horizontal)
 
                     Spacer()
+
+                    if store.totalAnswered > 0 {
+                        HStack(spacing: 28) {
+                            statItem("Answered", "\(store.totalAnswered)")
+                            statItem("Accuracy", "\(Int(store.accuracy * 100))%")
+                            statItem("Best streak", "\(store.bestStreak)")
+                        }
+                        .padding(.bottom, 12)
+                        .opacity(appear ? 1 : 0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: appear)
+                    }
                 }
             }
             .onAppear { appear = true }
             .onDisappear { appear = false }
         }
         .tint(.white)
+    }
+
+    private func statItem(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(Theme.headingFont)
+                .foregroundStyle(Theme.textPrimary)
+            Text(label)
+                .font(Theme.captionFont)
+                .foregroundStyle(Theme.textTertiary)
+        }
     }
 }
 

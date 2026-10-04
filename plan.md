@@ -2,7 +2,7 @@ Brain Anatomy Game
 A study tool built to help users memorize the anatomy of the human brain through interactive 3D exploration and quizzing. It's powered by the SPL/PNL/NAC Brain Atlas (2017), an open-source dataset containing hundreds of individually labeled brain structures as 3D models, along with MRI volume data.
 
 Main Menu
-The app opens to a simple menu with three game modes: Normal Mode, Explore Mode, and MRI Mode.
+The app opens to a simple menu with four game modes: Normal Mode, Explore Mode, MRI Mode, and MRI Quiz. The menu also shows lifetime study stats (questions answered, accuracy, best streak) once you've played.
 
 Normal Mode — 3D Quiz
 The core study mode. The app picks a random brain structure, renders it highlighted in red within a transparent ghost of the full brain (so you can see where it sits anatomically), and asks you to identify it from four multiple-choice options.
@@ -26,9 +26,15 @@ A simulated MRI experience using 3D models. The left and right white matter hemi
 
 A slider moves the slice position from bottom to top of the brain.
 As you drag, the model is dynamically cut away in real-time, revealing cross-sectional views similar to scrolling through axial MRI slices — but in a fully rotatable 3D space.
+An axis picker switches between axial, coronal, and sagittal planes.
+
+MRI Quiz — Identify From Slices
+Generates a cross-section through the brain (axial, coronal, or sagittal) with one structure highlighted and pulsing, and asks you to identify it from four options. Only slices where the target is meaningfully visible are used, distractors favor anatomically related structures, and a mini-brain shows where the slice sits.
+
+Both quiz modes run in fixed 10-question sessions that end on a results screen (score, accuracy, best streak, and the structures you missed), and they persist lifetime progress across launches.
 
 Data & Assets
-The brain atlas data includes a hierarchical JSON file that defines every structure's name, type, group membership, and associated 3D model file. The app loads this at startup and uses it to drive all three modes.
+The brain atlas data includes a hierarchical JSON file that defines every structure's name, type, group membership, and associated 3D model file. The app loads this at startup and uses it to drive all modes.
 
 Design
 The app should be simple and intuitive. Worthy of an apple design award.
