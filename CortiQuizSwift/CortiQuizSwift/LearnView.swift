@@ -25,8 +25,9 @@ fileprivate struct LearnCard: Identifiable, Hashable {
 final class LearnViewModel {
     var scene = SCNScene()
     var isLoading = true
+    var loadFailed = false
     var recenterTrigger = false
-    var explodeFactor: Float = 0
+    private(set) var explodeFactor: Float = 0
 
     fileprivate var currentCard: LearnCard?
     var revealed = false
@@ -43,38 +44,36 @@ final class LearnViewModel {
     var learnedCount: Int { learned.count }
 
     private var structureNodes: [String: SCNNode] = [:]
-    private var originalPositions: [String: SCNVector3] = [:]
-    private var brainCenter = SCNVector3Zero
-    private var setupStarted = false
+    private var explodeLayout = ExplodeLayout()
+    private var hasLoaded = false
 
-    private nonisolated static let backgroundColor = UIColor(white: 0.58, alpha: 1.0)
-    private nonisolated static let backgroundOpacity: CGFloat = 0.16
-    private nonisolated static let targetColor = UIColor(red: 0.96, green: 0.24, blue: 0.36, alpha: 1.0)
-
-    func setup() {
-        guard !setupStarted else { return }
-        setupStarted = true
-        isLoading = true
-
-        Task.detached { [weak self] in
-            let loaded = BrainSceneLoader.load { node, _ in
-                node.applyColor(Self.backgroundColor)
-            }
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.scene = loaded.scene
-                self.structureNodes = loaded.nodes
-                self.originalPositions = loaded.nodeCenters
-                self.brainCenter = loaded.center
-                self.buildDeck(from: loaded.structures)
-                self.startSession()
-                self.isLoading = false
+    /// Builds the scene off the main actor. Runs from SwiftUI's `.task`, so leaving the
+    /// screen mid-load cancels it and a later visit starts over.
+    func load() async {
+        guard !hasLoaded else { return }
+        let loaded = await Background.run {
+            BrainSceneLoader.load { node, _ in
+                node.applyColor(SceneColors.ghost)
             }
         }
+        guard !Task.isCancelled else { return }
+        hasLoaded = true
+        guard !loaded.structures.isEmpty else {
+            loadFailed = true
+            isLoading = false
+            return
+        }
+
+        scene = loaded.scene
+        structureNodes = loaded.nodes
+        explodeLayout = loaded.explodeLayout
+        buildDeck(from: loaded.structures)
+        startSession()
+        isLoading = false
     }
 
     /// Merge hemisphere pairs into one card per base name, then order so structures
-    /// the user has been missing in the quizzes surface first.
+    /// flagged for review or missed in the quizzes surface first.
     private func buildDeck(from structures: [BrainStructure]) {
         var grouped: [String: [BrainStructure]] = [:]
         for s in structures { grouped[s.baseName, default: []].append(s) }
@@ -87,18 +86,18 @@ final class LearnViewModel {
             )
         }
 
-        let weakSpots = Set(ProgressStore.shared.weakestStructures(limit: 8))
-        let weakCards = built.filter { weakSpots.contains($0.baseName) }.shuffled()
-        let restCards = built.filter { !weakSpots.contains($0.baseName) }.shuffled()
-        cards = weakCards + restCards
+        let store = ProgressStore.shared
+        let priority = Set(store.reviewQueue + store.weakestStructures(limit: 8))
+        let priorityCards = built.filter { priority.contains($0.baseName) }.shuffled()
+        let restCards = built.filter { !priority.contains($0.baseName) }.shuffled()
+        cards = priorityCards + restCards
     }
 
     func startSession() {
         learned = []
         struggled = []
         sessionComplete = false
-        explodeFactor = 0
-        updateExplode()
+        setExplode(0)
         queue = cards
         advance()
     }
@@ -118,17 +117,19 @@ final class LearnViewModel {
 
     /// Mark the current card learned and move on.
     func markKnown() {
-        guard currentCard != nil else { return }
+        guard let card = currentCard else { return }
         Theme.successHaptic()
-        learned.insert(currentCard!.baseName)
+        learned.insert(card.baseName)
         advance()
     }
 
-    /// Re-queue the current card so it comes back around later this pass.
+    /// Re-queue the current card so it comes back around later this pass, and flag it so
+    /// the next quiz asks it first.
     func markReview() {
         guard let card = currentCard else { return }
         Theme.tapHaptic()
         struggled.insert(card.baseName)
+        ProgressStore.shared.flagForReview(card.baseName)
         queue.append(card)
         advance()
     }
@@ -148,36 +149,18 @@ final class LearnViewModel {
     private func applyHighlight() {
         guard let card = currentCard else { return }
         let targets = Set(card.nodeIDs)
-        let highlight = revealed ? UIColor(Theme.accent) : Self.targetColor
+        let highlight = revealed ? SceneColors.revealed : SceneColors.target
 
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.25
-        for (id, node) in structureNodes {
-            if targets.contains(id) {
-                node.applyColor(highlight)
-                node.opacity = 1.0
-            } else {
-                node.applyColor(Self.backgroundColor)
-                node.opacity = Self.backgroundOpacity
-            }
-        }
-        SCNTransaction.commit()
-    }
-
-    func updateExplode() {
-        let factor = explodeFactor
-        for (id, node) in structureNodes {
-            guard let orig = originalPositions[id] else { continue }
-            node.position = SCNVector3(
-                (orig.x - brainCenter.x) * factor,
-                (orig.y - brainCenter.y) * factor,
-                (orig.z - brainCenter.z) * factor
-            )
+        restyleNodes(structureNodes) { id in
+            targets.contains(id)
+                ? (highlight, 1.0)
+                : (SceneColors.ghost, SceneColors.ghostOpacity)
         }
     }
 
-    func resetForReentry() {
-        setupStarted = false
+    func setExplode(_ factor: Float) {
+        explodeFactor = factor
+        explodeLayout.apply(factor, to: structureNodes)
     }
 }
 
@@ -190,14 +173,8 @@ struct LearnView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if vm.isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
-                    Text("Loading study deck…")
-                        .foregroundColor(Theme.textSecondary)
-                }
+            if vm.isLoading || vm.loadFailed {
+                LoadingStateView(message: "Loading study deck…", failed: vm.loadFailed)
             } else {
                 VStack(spacing: 0) {
                     progressHeader
@@ -207,15 +184,15 @@ struct LearnView: View {
                             .frame(maxHeight: .infinity)
                             .accessibilityLabel("3D brain with one structure highlighted. Rotate to inspect, then reveal the name.")
 
-                        sceneControls
-                            .padding(12)
+                        SceneControlsBar(
+                            explodeFactor: Binding(get: { vm.explodeFactor }, set: { vm.setExplode($0) }),
+                            onRecenter: { vm.recenterTrigger.toggle() }
+                        )
+                        .padding(12)
                     }
 
                     studyCard
-                        .padding()
-                        .background(RoundedRectangle(cornerRadius: 20).fill(Theme.bgCard))
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
+                        .bottomCard()
                 }
             }
 
@@ -228,8 +205,7 @@ struct LearnView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: vm.sessionComplete)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onAppear { vm.setup() }
-        .onDisappear { vm.resetForReentry() }
+        .task { await vm.load() }
     }
 
     // MARK: Header
@@ -251,45 +227,6 @@ struct LearnView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-    }
-
-    // MARK: Scene controls (explode + recenter) — shared idiom with the quiz modes.
-
-    private var sceneControls: some View {
-        HStack {
-            HStack {
-                Image(systemName: "arrow.down.right.and.arrow.up.left")
-                    .foregroundColor(Theme.textSecondary)
-                    .font(Theme.captionFont)
-                Slider(value: Binding(
-                    get: { vm.explodeFactor },
-                    set: { vm.explodeFactor = $0; vm.updateExplode() }
-                ), in: 0...3)
-                .tint(Theme.accent)
-                .accessibilityLabel("Explode view")
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .foregroundColor(Theme.textSecondary)
-                    .font(Theme.captionFont)
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 6)
-            .background(Theme.bgSecondary.opacity(0.8))
-            .clipShape(Capsule())
-
-            Spacer()
-
-            Button {
-                vm.recenterTrigger.toggle()
-            } label: {
-                Image(systemName: "scope")
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .padding(10)
-                    .background(Color.white.opacity(0.15))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel("Recenter camera")
-        }
     }
 
     // MARK: Study card (front = recall prompt, back = answer + self-rating)

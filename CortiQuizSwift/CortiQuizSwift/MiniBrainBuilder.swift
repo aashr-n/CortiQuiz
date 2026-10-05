@@ -33,13 +33,13 @@ enum MiniBrainBuilder {
     ) -> Result {
         let scene = SCNScene()
         var nodeMap: [String: SCNNode] = [:]
-        let gray = UIColor(white: 0.7, alpha: 0.35)
 
         for s in structures {
+            if Task.isCancelled { break }
             guard let fn = s.modelFileName,
                   let node = ModelCache.shared.node(for: fn)
             else { continue }
-            node.applyColor(gray)
+            node.applyColor(SceneColors.miniBrain)
             node.name = s.id
             scene.rootNode.addChildNode(node)
             nodeMap[s.id] = node
@@ -49,7 +49,7 @@ enum MiniBrainBuilder {
         let planeSize = bounds.maxExtent * 0.8
         let plane = SCNPlane(width: CGFloat(planeSize), height: CGFloat(planeSize))
         let planeMat = SCNMaterial()
-        planeMat.diffuse.contents = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 0.40) // brain-pink
+        planeMat.diffuse.contents = SceneColors.slicePlane
         planeMat.isDoubleSided = true
         planeMat.blendMode = .alpha
         plane.materials = [planeMat]

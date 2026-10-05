@@ -1,31 +1,60 @@
 import SwiftUI
 
+// MARK: - Modes
+
+enum AppMode: String, CaseIterable, Identifiable, Hashable {
+    case learn, quiz, explore, mri, mriQuiz
+
+    var id: Self { self }
+
+    var icon: String {
+        switch self {
+        case .learn: return "graduationcap.fill"
+        case .quiz: return "brain.head.profile"
+        case .explore: return "cube.transparent"
+        case .mri: return "waveform.path.ecg"
+        case .mriQuiz: return "brain.filled.head.profile"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .learn: return "Learn Mode"
+        case .quiz: return "Normal Mode"
+        case .explore: return "Explore Mode"
+        case .mri: return "MRI Mode"
+        case .mriQuiz: return "MRI Quiz"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .learn: return "Flashcards — study with no pressure"
+        case .quiz: return "Identify brain structures"
+        case .explore: return "Browse the full brain atlas"
+        case .mri: return "Dynamic brain cross-sections"
+        case .mriQuiz: return "Identify structures from slices"
+        }
+    }
+
+    /// Built only when the mode is opened.
+    @ViewBuilder var destination: some View {
+        switch self {
+        case .learn: LearnView()
+        case .quiz: QuizView()
+        case .explore: ExploreView()
+        case .mri: MRIView()
+        case .mriQuiz: MRIQuizView()
+        }
+    }
+}
+
+// MARK: - Main Menu
+
 struct MainMenuView: View {
     @State private var appear = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let store = ProgressStore.shared
-
-    private struct ModeInfo: Identifiable {
-        let id = UUID()
-        let icon: String
-        let title: String
-        let subtitle: String
-        let destination: AnyView
-    }
-
-    private var modes: [ModeInfo] {
-        [
-            ModeInfo(icon: "graduationcap.fill", title: "Learn Mode",
-                     subtitle: "Flashcards — study with no pressure", destination: AnyView(LearnView())),
-            ModeInfo(icon: "brain.head.profile", title: "Normal Mode",
-                     subtitle: "Identify brain structures", destination: AnyView(QuizView())),
-            ModeInfo(icon: "cube.transparent", title: "Explore Mode",
-                     subtitle: "Browse the full brain atlas", destination: AnyView(ExploreView())),
-            ModeInfo(icon: "waveform.path.ecg", title: "MRI Mode",
-                     subtitle: "Dynamic brain cross-sections", destination: AnyView(MRIView())),
-            ModeInfo(icon: "brain.filled.head.profile", title: "MRI Quiz",
-                     subtitle: "Identify structures from slices", destination: AnyView(MRIQuizView())),
-        ]
-    }
 
     var body: some View {
         NavigationStack {
@@ -46,21 +75,20 @@ struct MainMenuView: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .opacity(appear ? 1 : 0)
-                    .offset(y: appear ? 0 : -20)
-                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: appear)
+                    .offset(y: slideOffset(-20))
+                    .animation(entrance(), value: appear)
 
                     Spacer()
 
                     VStack(spacing: 16) {
-                        ForEach(Array(modes.enumerated()), id: \.element.id) { index, mode in
-                            NavigationLink(destination: mode.destination) {
+                        ForEach(Array(AppMode.allCases.enumerated()), id: \.element) { index, mode in
+                            NavigationLink(value: mode) {
                                 ModeCard(icon: mode.icon, title: mode.title, subtitle: mode.subtitle)
                             }
                             .buttonStyle(PressableStyle())
                             .opacity(appear ? 1 : 0)
-                            .offset(y: appear ? 0 : 30)
-                            .animation(.spring(response: 0.6, dampingFraction: 0.8)
-                                .delay(Double(index) * 0.08), value: appear)
+                            .offset(y: slideOffset(30))
+                            .animation(entrance(delay: Double(index) * 0.08), value: appear)
                         }
                     }
                     .padding(.horizontal)
@@ -75,14 +103,27 @@ struct MainMenuView: View {
                         }
                         .padding(.bottom, 12)
                         .opacity(appear ? 1 : 0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: appear)
+                        .animation(entrance(delay: 0.4), value: appear)
                     }
                 }
             }
+            .navigationDestination(for: AppMode.self) { $0.destination }
             .onAppear { appear = true }
             .onDisappear { appear = false }
         }
         .tint(.white)
+    }
+
+    /// Slide-in distance before the entrance animation; none with Reduce Motion.
+    private func slideOffset(_ distance: CGFloat) -> CGFloat {
+        appear || reduceMotion ? 0 : distance
+    }
+
+    /// Staggered spring normally; a plain short fade with Reduce Motion.
+    private func entrance(delay: Double = 0) -> Animation {
+        reduceMotion
+            ? .easeOut(duration: 0.2)
+            : .spring(response: 0.6, dampingFraction: 0.8).delay(delay)
     }
 
     private func statItem(_ label: String, _ value: String) -> some View {

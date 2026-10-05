@@ -7,73 +7,48 @@ import SceneKit
 final class MRIViewModel {
     var slicePosition: Float = 0.5
     var isLoading = true
+    var loadFailed = false
     var sliceImage: UIImage?
     var miniBrainScene = SCNScene()
-    var recenterMini = false
     var activeAxis: MRIAxis = .axial
 
-    private var allNodes: [SCNNode] = []
-    private var bounds = MiniBrainBuilder.Bounds()
-    private var setupStarted = false
-    private var renderer: SCNRenderer?
-    private var mriScene: SCNScene?
+    private var bounds = MiniBrainBounds()
+    private var sliceRenderer: SliceRenderer?
     private var slicePlaneNode: SCNNode?
     private var isDragging = false
+    /// Ticket of the frame on screen, so a late frame never replaces a newer one.
+    private var shownTicket = 0
+    private var hasLoaded = false
 
-    func setup() {
-        guard !setupStarted else { return }
-        setupStarted = true
-        isLoading = true
-
-        Task.detached { [weak self] in
+    /// Builds the slice and mini-brain scenes off the main actor. Runs from SwiftUI's
+    /// `.task`, so leaving the screen mid-load cancels it and a later visit starts over.
+    func load() async {
+        guard !hasLoaded else { return }
+        let assets = await Background.run {
             let loaded = BrainSceneLoader.load { node, s in
                 node.installClipShader(color: UIColor(s.color))
             }
-            let miniResult = MiniBrainBuilder.build(structures: loaded.structures, bounds: loaded.bounds)
-
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.mriScene = loaded.scene
-                self.miniBrainScene = miniResult.scene
-                self.allNodes = loaded.ordered.map { $0.node }
-                self.bounds = loaded.bounds
-                self.slicePlaneNode = miniResult.planeNode
-                self.setupRenderer()
-                self.isLoading = false
-                self.updateAxis()
-            }
+            let mini = MiniBrainBuilder.build(structures: loaded.structures, bounds: loaded.bounds)
+            let renderer = SliceRenderer(scene: loaded.scene, nodes: loaded.ordered.map(\.node))
+            return (loaded: loaded, mini: mini, renderer: renderer)
         }
-    }
+        guard !Task.isCancelled else { return }
+        hasLoaded = true
+        guard !assets.loaded.structures.isEmpty else {
+            loadFailed = true
+            isLoading = false
+            return
+        }
 
-    private func setupRenderer() {
-        guard let scene = mriScene else { return }
-
-        let camera = SCNCamera()
-        camera.usesOrthographicProjection = true
-        camera.orthographicScale = 90
-        camera.zNear = 1
-        camera.zFar = 2000
-        let camNode = SCNNode()
-        camNode.camera = camera
-        camNode.name = "mriCamera"
-        scene.rootNode.addChildNode(camNode)
-
-        let ambient = SCNNode()
-        ambient.light = SCNLight()
-        ambient.light?.type = .ambient
-        ambient.light?.intensity = 1000
-        ambient.light?.color = UIColor.white
-        scene.rootNode.addChildNode(ambient)
-
-        let r = SCNRenderer(device: nil, options: nil)
-        r.scene = scene
-        r.pointOfView = camNode
-        self.renderer = r
+        bounds = assets.loaded.bounds
+        miniBrainScene = assets.mini.scene
+        slicePlaneNode = assets.mini.planeNode
+        sliceRenderer = assets.renderer
+        isLoading = false
+        updateAxis()
     }
 
     func updateAxis() {
-        guard let camNode = mriScene?.rootNode.childNode(withName: "mriCamera", recursively: false) else { return }
-        MRISlicing.orientCamera(camNode, for: activeAxis)
         slicePlaneNode?.eulerAngles = MRISlicing.planeEuler(for: activeAxis)
         updateSlice(highQuality: true)
     }
@@ -90,30 +65,27 @@ final class MRIViewModel {
         if !editing { updateSlice(highQuality: true) }
     }
 
+    /// Moves the mini-brain plane right away and renders the slice on the render queue:
+    /// a full-res multisampled frame when settled, a smaller cheaper one while dragging.
     func updateSlice(highQuality: Bool) {
         let (minVal, maxVal) = MRISlicing.extent(bounds, for: activeAxis)
-        let clipCoord = minVal + (maxVal - minVal) * slicePosition
-        let thickness: Float = 2.0
-        let viewClipZ = MRISlicing.viewClip(forCoord: clipCoord)
+        let coord = minVal + (maxVal - minVal) * slicePosition
+        let axis = activeAxis
+        slicePlaneNode?.position = MRISlicing.planePosition(forCoord: coord, axis: axis)
 
-        for node in allNodes {
-            node.updateClipUniforms(viewClipZ: viewClipZ, thickness: thickness)
+        guard let sliceRenderer else { return }
+        Task {
+            let frame = await sliceRenderer.run(dropIfSuperseded: true) { r in
+                r.orient(axis)
+                r.setSlice(coord: coord, thickness: 2)
+                return highQuality
+                    ? r.snapshot()
+                    : r.snapshot(size: MRISlicing.snapshotSize / 2, antialiased: false)
+            }
+            guard let frame, frame.ticket > shownTicket else { return }
+            shownTicket = frame.ticket
+            sliceImage = frame.value
         }
-        renderSnapshot(highQuality: highQuality)
-
-        slicePlaneNode?.position = MRISlicing.planePosition(forCoord: clipCoord, axis: activeAxis)
-    }
-
-    /// Full-res multisampled snapshot when settled; smaller, cheaper frame while dragging.
-    private func renderSnapshot(highQuality: Bool) {
-        guard let renderer else { return }
-        let dim: CGFloat = highQuality ? 512 : 256
-        let aa: SCNAntialiasingMode = highQuality ? .multisampling4X : .none
-        sliceImage = renderer.snapshot(atTime: 0, with: CGSize(width: dim, height: dim), antialiasingMode: aa)
-    }
-
-    func resetForReentry() {
-        setupStarted = false
     }
 }
 
@@ -150,14 +122,8 @@ struct MRIView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if vm.isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
-                    Text("Loading MRI data…")
-                        .foregroundColor(Theme.textSecondary)
-                }
+            if vm.isLoading || vm.loadFailed {
+                LoadingStateView(message: "Loading MRI data…", failed: vm.loadFailed)
             } else {
                 VStack(spacing: 0) {
                     HStack {
@@ -248,7 +214,6 @@ struct MRIView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onAppear { vm.setup() }
-        .onDisappear { vm.resetForReentry() }
+        .task { await vm.load() }
     }
 }

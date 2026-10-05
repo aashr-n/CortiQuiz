@@ -4,19 +4,15 @@ import SceneKit
 
 /// Result of building a brain scene on a background thread. Safe to hand to the MainActor.
 nonisolated struct LoadedBrainScene {
-    /// Every structure from the atlas (groups included), for hierarchy/search.
-    let allStructures: [BrainStructure]
-    /// Brain-only, model-backed, non-group structures — the set every mode renders.
+    /// Brain-only, non-group structures whose model loaded — the set every mode renders.
     let structures: [BrainStructure]
     let scene: SCNScene
     /// id → node, for fast recolor/lookup.
     let nodes: [String: SCNNode]
     /// Same nodes in stable order alongside their structure (MRI modes index into this).
     let ordered: [(node: SCNNode, structure: BrainStructure)]
-    /// id → that structure's bounding-box center (explode mode pushes nodes out from here).
-    let nodeCenters: [String: SCNVector3]
-    /// Mean of per-structure bounding-box centers (used to frame/explode).
-    let center: SCNVector3
+    /// Per-structure bounding-box centers and their mean, for explode mode.
+    let explodeLayout: ExplodeLayout
     /// Combined min/max extent across all loaded structures.
     let bounds: MiniBrainBounds
 }
@@ -33,10 +29,8 @@ nonisolated enum BrainSceneLoader {
 
     /// Build the scene. `configure` sets up each node's appearance (solid color, ghost,
     /// clip shader, …) and is called synchronously per node before it's added to the scene.
+    /// Stops early if the calling task is cancelled; callers should discard the result then.
     static func load(configure: (SCNNode, BrainStructure) -> Void) -> LoadedBrainScene {
-        let all = AtlasLoader.load()
-        let brain = brainOnly(all)
-
         let scene = SCNScene()
         var nodes: [String: SCNNode] = [:]
         var ordered: [(node: SCNNode, structure: BrainStructure)] = []
@@ -45,7 +39,8 @@ nonisolated enum BrainSceneLoader {
         var totalX: Float = 0, totalY: Float = 0, totalZ: Float = 0
         var count: Float = 0
 
-        for s in brain {
+        for s in brainOnly(AtlasLoader.load()) {
+            if Task.isCancelled { break }
             guard let fn = s.modelFileName, let node = ModelCache.shared.node(for: fn) else { continue }
             configure(node, s)
             node.name = s.id
@@ -71,13 +66,11 @@ nonisolated enum BrainSceneLoader {
             : SCNVector3Zero
 
         return LoadedBrainScene(
-            allStructures: all,
-            structures: brain,
+            structures: ordered.map(\.structure),
             scene: scene,
             nodes: nodes,
             ordered: ordered,
-            nodeCenters: nodeCenters,
-            center: center,
+            explodeLayout: ExplodeLayout(centers: nodeCenters, brainCenter: center),
             bounds: bounds
         )
     }

@@ -4,7 +4,8 @@ import SceneKit
 struct SceneKitView: UIViewRepresentable {
     let scene: SCNScene
     var allowsCameraControl: Bool = true
-    var onTap: ((SCNHitTestResult) -> Void)? = nil
+    /// Called with every hit under the tap, nearest first.
+    var onTap: (([SCNHitTestResult]) -> Void)? = nil
     var recenterTrigger: Bool = false  // Toggle to trigger recenter
     
     func makeUIView(context: Context) -> SCNView {
@@ -221,16 +222,16 @@ struct SceneKitView: UIViewRepresentable {
     }
     
     class Coordinator: NSObject {
-        let onTap: ((SCNHitTestResult) -> Void)?
+        let onTap: (([SCNHitTestResult]) -> Void)?
         var lastRecenter: Bool = false
-        init(onTap: ((SCNHitTestResult) -> Void)?) { self.onTap = onTap }
+        init(onTap: (([SCNHitTestResult]) -> Void)?) { self.onTap = onTap }
         
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView else { return }
             let loc = gesture.location(in: view)
             let hits = view.hitTest(loc, options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
-            if let hit = hits.first {
-                onTap?(hit)
+            if !hits.isEmpty {
+                onTap?(hits)
             }
         }
     }

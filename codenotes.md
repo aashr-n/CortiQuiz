@@ -12,32 +12,35 @@
 ## Files
 | File | Purpose |
 |------|---------|
-| `BrainStructure.swift` | JSON decoding (`AtlasEntry`) + domain model (`BrainStructure`) |
-| `AtlasLoader.swift` | Parses `atlasStructure.json`, builds hierarchy, `ModelCache` for OBJ loading. Cached after first parse. |
-| `Theme.swift` | Design tokens: monochrome + brain-pink palette, New York serif typography, haptic helpers, `PressableStyle`, `Color(hex:)` + `Color.fromRGB` extensions |
-| `SceneUtilities.swift` | Shared `SCNNode` extensions: `applyColor`, `applyTransparency`, `installClipShader`, `updateClipUniforms`, `updateDiffuseColor` |
-| `OBJMeshParser.swift` | Raw OBJ mesh parsing + MRI slice visibility scoring for quiz target selection |
-| `MiniBrainBuilder.swift` | Shared mini-brain scene construction (gray translucent brain + slice plane + camera/lights) |
-| `SceneKitView.swift` | `UIViewRepresentable` wrapping `SCNView` — camera/lights via `ensureSceneSetup` |
-| `MainMenuView.swift` | 4-mode menu with staggered animations, `PressableStyle`, data-driven cards |
-| `QuizView.swift` | Quiz mode — random structure quiz with ghost brain overlay + haptics |
-| `ExploreView.swift` | Explore mode — all structures, search, tap-select with animated transitions, explode slider |
-| `MRIView.swift` | MRI mode — 2D slice rendering with uniform-based clip shaders + mini-brain |
-| `MRIQuizView.swift` | MRI quiz — identify structures from 2D MRI slices with pulsing highlight |
+| `BrainStructure.swift` | JSON decoding (`AtlasEntry`) + domain model (`BrainStructure`, `baseName` for L/R pairing) |
+| `AtlasLoader.swift` | Parses `atlasStructure.json` once (lazy static), builds hierarchy; `ModelCache` loads + deep-clones OBJ nodes on a serial queue |
+| `BrainSceneLoader.swift` | Shared "brain-only structures → cloned nodes → bounds/centers" scene build used by every mode; honors task cancellation |
+| `SceneUtilities.swift` | `Background.run` (`@concurrent` off-main work), `restyleNodes`, `ExplodeLayout`, clip-shader `SCNNode` helpers |
+| `Theme.swift` | Design tokens (SwiftUI) + `SceneColors` (SceneKit material colors, nonisolated), haptics, `PressableStyle`, `Color.fromRGB` |
+| `SharedViews.swift` | `LoadingStateView`, `ExplodeSlider`, `RecenterButton`, `SceneControlsBar`, `.bottomCard()` |
+| `QuizSupport.swift` | `QuizOptionBuilder` (distractors), `QuizTargetPicker` (flagged → weak → unasked, by baseName), `QuizSession`, `AnswerOptionsView`, `ScoreLabel`, `QuizResultsView` |
+| `ProgressStore.swift` | Persistent stats, best session streak, Learn-mode review queue (UserDefaults JSON; injectable defaults for tests) |
+| `MRISlicing.swift` | `MRIAxis`, slice camera/clip/plane geometry + shared constants, `SliceRenderer` (snapshots on a private queue) |
+| `SliceClassifier.swift` | Reads triangles from loaded SceneKit geometry, scores slice visibility for MRI Quiz, caches results per session |
+| `MiniBrainBuilder.swift` | Gray translucent mini-brain scene + slice plane for the MRI modes |
+| `SceneKitView.swift` | `UIViewRepresentable` wrapping `SCNView` — camera/lights via `ensureSceneSetup`, tap → all hits |
+| `MainMenuView.swift` | `AppMode` enum + menu; destinations built lazily via `navigationDestination` |
+| `LearnView.swift` / `QuizView.swift` / `ExploreView.swift` / `MRIView.swift` / `MRIQuizView.swift` | The five modes. Each view model loads in `load() async`, started by `.task` (cancelled on disappear) |
 | `CortiQuizSwiftApp.swift` | Entry point → `MainMenuView` |
+| `../tools/convert_vtk_to_obj.py` | Regenerates `BrainModels/*.obj` from `brainAtlas2017-01/models/*.vtk` (byte-identical to the shipped files) |
 
 ## Data
-- 359 OBJ models in `BrainModels/` (converted from VTK)
+- OBJ models in `BrainModels/`, converted from the atlas VTK triangle strips by `tools/convert_vtk_to_obj.py`
 - `atlasStructure.json` in bundle root
-- Non-brain structures (muscles, skin: Model_4xxx, Model_3_skin) filtered at runtime via `isBrainStructure`
-- All models shipped in bundle for future "all structures" mode
+- Only the 255 brain structures (252 files, including the 22 sulci) are used; muscles/skin (Model_4xxx, Model_3_skin) are filtered by `isBrainStructure`. The non-`1` copies of the sulci, colliculi and left optic nerve aren't referenced by the atlas JSON (it uses the `…1.obj` versions). See `todo.md` for removing the unused files.
 
 ## Known Considerations
-- Bundle size is ~120MB due to 359 OBJ models
 - SCNSceneSource does NOT load .obj — using MDLAsset + SceneKit.ModelIO bridge
-- iOS deployment target is 26.2 (Xcode 26.3 beta)
+- iOS deployment target is 26.2; Swift 5 language mode with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and approachable concurrency
 - Quiz L/R merging strips prefixes from names for answer matching
-- Explode view: factor 0 = collapsed to origin (by design — offset-based), factor > 0 spreads outward
+- Explode view: factor 0 is the natural layout (vertices are world-space; node positions are offsets)
+- SceneKit `orthographicScale` is half the visible height: the slice camera shows 180 mm across 512 px (`MRISlicing.pixelsPerUnit`)
+- iPhone is portrait-only; the app forces dark appearance (`UIUserInterfaceStyle = Dark`)
 
 ## Bug Fixes Applied (2026-03-03)
 - **Model Loading Fix**: `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` made `AtlasLoader`, `ModelCache`, `AtlasEntry`, `BrainStructure`, and `Color.fromRGB` implicitly `@MainActor` — they couldn't be called from `Task.detached`. Fixed by adding explicit `nonisolated` to all data/utility types. `ModelCache` also marked `@unchecked Sendable` (uses internal `DispatchQueue` for thread safety).
@@ -134,5 +137,11 @@
 - **Dynamic Node State Highlights**: Added `updateNodeStates()` using `SCNNode.opacity`. Target region is colored cyan and set to `1.0` opacity before answering, with all other structures at `0.15` opacity. After answer submission, the correct structure highlights green (`Theme.correct`), and any incorrectly selected structure highlights red (`Theme.incorrect`).
 - **Explode Slider Integration**: Added an explode slider (`explodeFactor` bounding to 3D node translations outward from the calculated brain center) in the quiz view overlay, resetting to `0` on each new question.
 
-
-
+## Review Fixes (2026-10-04)
+- **MRI Quiz visibility math**: slice footprints used 512/90 px per mm, but the camera shows 180 mm across, so sizes were 2× (areas 4×) too large and ~12 px targets passed a "24 px" rule. Now `MRISlicing.pixelsPerUnit` (512/180), with thresholds of 14 px / 80 px² (≈10 pt on screen): 249 of 252 structures stay quizzable.
+- **MRI Quiz loading**: triangles are read from the already-loaded SceneKit geometry instead of re-parsing every OBJ, and classification results (not meshes) are cached for the session.
+- **Off-main rendering**: `SliceRenderer` snapshots on a private queue; MRI Mode drops superseded slider frames, MRI Quiz swaps slice + answers in together.
+- **Quiz targets**: picked per baseName (pairs no longer 2× as likely), no repeats within a session, Learn-mode "Study again" cards first, weak spots mixed in. Results show the session's best streak; lifetime best streak = best single session.
+- **Loading**: `.task { await vm.load() }` replaces `Task.detached` + `setupStarted`/`resetForReentry`; leaving a mode mid-load cancels it.
+- **Misc**: single haptic per answer, Reduce Motion respected (MRI pulse, menu), load-failure message instead of an endless spinner, MRI wrong answers mark both hemispheres, Explore taps prefer the opaque (selected) structure, iPhone portrait-only, forced dark mode, dead code removed, shared UI components extracted.
+- **Tests**: unit tests for atlas filtering, option builder, target picker, session, progress persistence (incl. legacy blobs), explode layout, slice scale (rendered), footprint math, and mesh extraction; UI smoke tests for every mode.

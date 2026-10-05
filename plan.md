@@ -2,10 +2,13 @@ Brain Anatomy Game
 A study tool built to help users memorize the anatomy of the human brain through interactive 3D exploration and quizzing. It's powered by the SPL/PNL/NAC Brain Atlas (2017), an open-source dataset containing hundreds of individually labeled brain structures as 3D models, along with MRI volume data.
 
 Main Menu
-The app opens to a simple menu with four game modes: Normal Mode, Explore Mode, MRI Mode, and MRI Quiz. The menu also shows lifetime study stats (questions answered, accuracy, best streak) once you've played.
+The app opens to a simple menu with five modes: Learn Mode, Normal Mode, Explore Mode, MRI Mode, and MRI Quiz. The menu also shows lifetime study stats (questions answered, accuracy, best streak) once you've played.
+
+Learn Mode — Flashcards
+A no-pressure study deck. One structure (both hemispheres for left/right pairs) is highlighted in the ghost brain; you try to recall it, reveal the name and its place in the hierarchy, then mark it "Got it" or "Study again". Cards you've been missing in quizzes come first, and "Study again" cards are re-queued and also flagged so the next quiz asks them first.
 
 Normal Mode — 3D Quiz
-The core study mode. The app picks a random brain structure, renders it highlighted in red within a transparent ghost of the full brain (so you can see where it sits anatomically), and asks you to identify it from four multiple-choice options.
+The core study mode. The app picks a brain structure by name (a left/right pair counts once, and nothing repeats within a session), asking structures flagged in Learn Mode first and mixing in your weakest structures, renders it highlighted in red within a transparent ghost of the full brain (so you can see where it sits anatomically), and asks you to identify it from four multiple-choice options.
 
 The 3D view is fully interactive — you can rotate, zoom, and pan around the brain.
 The camera auto-centers on the target structure each round.
@@ -29,9 +32,9 @@ As you drag, the model is dynamically cut away in real-time, revealing cross-sec
 An axis picker switches between axial, coronal, and sagittal planes.
 
 MRI Quiz — Identify From Slices
-Generates a cross-section through the brain (axial, coronal, or sagittal) with one structure highlighted and pulsing, and asks you to identify it from four options. Only slices where the target is meaningfully visible are used, distractors favor anatomically related structures, and a mini-brain shows where the slice sits.
+Generates a cross-section through the brain (axial, coronal, or sagittal) with one structure highlighted and pulsing, and asks you to identify it from four options. Only slices where the target is meaningfully visible (at least ~10 pt across on screen) are used, distractors favor anatomically related structures, and a mini-brain shows where the slice sits.
 
-Both quiz modes run in fixed 10-question sessions that end on a results screen (score, accuracy, best streak, and the structures you missed), and they persist lifetime progress across launches.
+Both quiz modes run in fixed 10-question sessions that end on a results screen (score, accuracy, the session's best streak, and the structures you missed), and they persist lifetime progress across launches.
 
 Data & Assets
 The brain atlas data includes a hierarchical JSON file that defines every structure's name, type, group membership, and associated 3D model file. The app loads this at startup and uses it to drive all modes.

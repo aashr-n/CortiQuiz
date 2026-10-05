@@ -26,6 +26,156 @@ enum QuizOptionBuilder {
     }
 }
 
+// MARK: - Target Picker
+
+/// Chooses the next quiz target by anatomical name (`baseName`), so a left/right pair is
+/// no more likely than a midline structure. In order of preference:
+/// 1. structures flagged "Study again" in Learn mode (oldest first),
+/// 2. now and then, one of your weakest structures,
+/// 3. any structure not yet asked this session.
+enum QuizTargetPicker {
+    static func pick<R: RandomNumberGenerator>(
+        from baseNames: [String],
+        flagged: [String],
+        weak: [String],
+        exclude asked: Set<String>,
+        weakChance: Double = 0.3,
+        using rng: inout R
+    ) -> String? {
+        var available = baseNames.filter { !asked.contains($0) }
+        if available.isEmpty { available = baseNames }
+        let availableSet = Set(available)
+
+        if let next = flagged.first(where: availableSet.contains) { return next }
+
+        let weakAvailable = weak.filter(availableSet.contains)
+        if !weakAvailable.isEmpty, Double.random(in: 0..<1, using: &rng) < weakChance {
+            return weakAvailable.randomElement(using: &rng)
+        }
+        return available.randomElement(using: &rng)
+    }
+
+    static func pick(from baseNames: [String], flagged: [String], weak: [String], exclude asked: Set<String>) -> String? {
+        var rng = SystemRandomNumberGenerator()
+        return pick(from: baseNames, flagged: flagged, weak: weak, exclude: asked, using: &rng)
+    }
+}
+
+// MARK: - Session
+
+/// Score and streak bookkeeping for one fixed-length session, shared by both quiz modes.
+struct QuizSession {
+    let length: Int
+    private(set) var answered = 0
+    private(set) var score = 0
+    private(set) var streak = 0
+    private(set) var bestStreak = 0
+    /// Correct answers the user got wrong, without duplicates, in the order missed.
+    private(set) var missed: [String] = []
+    /// baseNames already asked, so a session never repeats a structure.
+    private(set) var asked: Set<String> = []
+
+    init(length: Int = 10) {
+        self.length = length
+    }
+
+    var isFinished: Bool { answered >= length }
+
+    /// 1-based number of the question on screen.
+    func questionNumber(showingFeedback: Bool) -> Int {
+        min(answered + (showingFeedback ? 0 : 1), length)
+    }
+
+    mutating func markAsked(_ baseName: String) {
+        asked.insert(baseName)
+    }
+
+    mutating func record(correctAnswer: String, wasCorrect: Bool) {
+        answered += 1
+        if wasCorrect {
+            score += 1
+            streak += 1
+            bestStreak = max(bestStreak, streak)
+        } else {
+            streak = 0
+            if !missed.contains(correctAnswer) { missed.append(correctAnswer) }
+        }
+    }
+}
+
+// MARK: - Shared Quiz Views
+
+struct ScoreLabel: View {
+    let score: Int
+    let total: Int
+
+    var body: some View {
+        Label("\(score)/\(total)", systemImage: "star.fill")
+            .foregroundColor(Theme.scoreGold)
+            .font(Theme.headingFont)
+            .accessibilityLabel("Score \(score) of \(total)")
+    }
+}
+
+/// Multiple-choice buttons with correct/incorrect feedback, then "Next →" once answered.
+struct AnswerOptionsView: View {
+    let options: [String]
+    let correctAnswer: String
+    let selectedAnswer: String?
+    let showingFeedback: Bool
+    var nextDisabled = false
+    let onAnswer: (String) -> Void
+    let onNext: () -> Void
+
+    var body: some View {
+        ForEach(options, id: \.self) { option in
+            Button {
+                onAnswer(option)
+            } label: {
+                HStack {
+                    Text(option)
+                        .font(Theme.bodyFont)
+                        .multilineTextAlignment(.leading)
+                    Spacer()
+                    if showingFeedback && option == correctAnswer {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(Theme.correct)
+                    }
+                    if showingFeedback && option == selectedAnswer && option != correctAnswer {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(Theme.incorrect)
+                    }
+                }
+                .padding()
+                .background(background(for: option))
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .disabled(showingFeedback)
+            .accessibilityIdentifier("answerOption")
+        }
+
+        if showingFeedback {
+            Button("Next →", action: onNext)
+                .font(Theme.headingFont)
+                .foregroundColor(.black)
+                .padding(.horizontal, 40)
+                .padding(.vertical, 12)
+                .background(Theme.accent)
+                .clipShape(Capsule())
+                .disabled(nextDisabled)
+                .transition(.scale)
+        }
+    }
+
+    private func background(for option: String) -> Color {
+        guard showingFeedback else { return Theme.bgCard }
+        if option == correctAnswer { return Theme.correct.opacity(0.3) }
+        if option == selectedAnswer { return Theme.incorrect.opacity(0.3) }
+        return Color.white.opacity(0.05)
+    }
+}
+
 // MARK: - Session Results
 
 /// Shared end-of-session summary for both quiz modes.

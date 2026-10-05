@@ -12,8 +12,6 @@ enum Theme {
 
     // MARK: Accent — dusty brain-pink
     static let accent = Color(red: 0.83, green: 0.51, blue: 0.60)       // #D4829A
-    static let accentBright = Color(red: 0.90, green: 0.55, blue: 0.65) // brighter for highlights
-    static let accentDim = Color(red: 0.55, green: 0.33, blue: 0.40)    // muted for subtle use
 
     // MARK: Monochrome
     static let textPrimary = Color.white
@@ -33,7 +31,6 @@ enum Theme {
     static let headingFont: Font = .system(.headline, design: .serif)
     static let bodyFont: Font = .system(.subheadline)
     static let captionFont: Font = .system(.caption)
-    static let monoFont: Font = .system(.footnote, design: .monospaced).weight(.medium)
 
     // MARK: Haptics
     static func tapHaptic() {
@@ -49,6 +46,42 @@ enum Theme {
     }
 }
 
+// MARK: - 3D Scene Colors
+
+/// Material colors for the SceneKit views. `nonisolated` (and plain RGB rather than
+/// `UIColor(Theme.…)`) because nodes are styled on background threads while scenes load.
+/// Values mirror the `Theme` palette above.
+nonisolated enum SceneColors {
+    /// Faded "context" brain behind a highlighted structure.
+    static let ghost = UIColor(white: 0.58, alpha: 1.0)
+    static let ghostOpacity: CGFloat = 0.16
+    /// Structure the user is asked to identify.
+    static let target = UIColor(red: 0.96, green: 0.24, blue: 0.36, alpha: 1.0)
+    /// Learn mode: highlight once the answer is revealed (Theme.accent).
+    static let revealed = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 1.0)
+    /// Explore mode: the tapped / searched structure.
+    static let selection = UIColor(red: 0.30, green: 0.85, blue: 0.45, alpha: 1.0)
+    static let correct = UIColor(red: 0.30, green: 0.85, blue: 0.45, alpha: 1.0)   // Theme.correct
+    static let incorrect = UIColor(red: 0.90, green: 0.30, blue: 0.30, alpha: 1.0) // Theme.incorrect
+    /// The other hemisphere of a correctly answered left/right pair.
+    static let pairedCorrect = UIColor(red: 0.25, green: 0.55, blue: 0.95, alpha: 1.0)
+    static let pairedCorrectOpacity: CGFloat = 0.75
+
+    // MRI modes
+    static let miniBrain = UIColor(white: 0.7, alpha: 0.35)
+    static let slicePlane = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 0.40)
+    /// MRI quiz target pulses between these two.
+    static let mriTarget = UIColor.white
+    static let mriTargetDim = UIColor(red: 0.0, green: 0.82, blue: 0.78, alpha: 1.0)
+
+    /// Non-target regions in the MRI quiz slice: same hue, much darker.
+    static func mriDimmed(_ color: UIColor) -> UIColor {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return UIColor(red: r * 0.2, green: g * 0.2, blue: b * 0.2, alpha: 0.4)
+    }
+}
+
 // MARK: - Pressable Button Style
 
 struct PressableStyle: ButtonStyle {
@@ -60,20 +93,10 @@ struct PressableStyle: ButtonStyle {
     }
 }
 
-// MARK: - Hex Color (kept for JSON color parsing in atlasStructure.json)
+// MARK: - Atlas Color Parsing
 
 extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: .alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let r, g, b: Double
-        r = Double((int >> 16) & 0xFF) / 255
-        g = Double((int >> 8) & 0xFF) / 255
-        b = Double(int & 0xFF) / 255
-        self.init(red: r, green: g, blue: b)
-    }
-
+    /// Parses atlasStructure.json's `rgb(r,g,b)` colors.
     nonisolated static func fromRGB(_ str: String?) -> Color {
         guard let str = str,
               str.hasPrefix("rgb("),

@@ -6,13 +6,13 @@ import SceneKit.ModelIO
 // MARK: - Atlas Loader
 
 nonisolated enum AtlasLoader {
-    
-    private static var cached: [BrainStructure]?
-    private static let cacheQueue = DispatchQueue(label: "atlascache")
-    
-    static func load() -> [BrainStructure] {
-        if let hit = cacheQueue.sync(execute: { cached }) { return hit }
-        
+
+    /// Parsed once per app session; Swift initializes static lets lazily and thread-safely.
+    private static let cached = parse()
+
+    static func load() -> [BrainStructure] { cached }
+
+    private static func parse() -> [BrainStructure] {
         guard let url = Bundle.main.url(forResource: "atlasStructure", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let entries = try? JSONDecoder().decode([AtlasEntry].self, from: data)
@@ -77,7 +77,6 @@ nonisolated enum AtlasLoader {
             structures[i].hierarchyPath = path
         }
         
-        cacheQueue.sync { cached = structures }
         return structures
     }
 }
@@ -89,24 +88,25 @@ nonisolated final class ModelCache: @unchecked Sendable {
     private var cache: [String: SCNNode] = [:]
     private let queue = DispatchQueue(label: "modelcache")
     
+    /// Returns a deep clone of the cached template. Loading and cloning both happen on the
+    /// serial queue, so two modes loading at once never parse the same file twice or clone
+    /// a template from two threads.
     func node(for fileName: String) -> SCNNode? {
-        if let cached = queue.sync(execute: { cache[fileName] }) {
-            return Self.deepClone(cached)
+        queue.sync {
+            if let cached = cache[fileName] { return Self.deepClone(cached) }
+
+            guard let url = Bundle.main.url(forResource: fileName.replacingOccurrences(of: ".obj", with: ""),
+                                             withExtension: "obj") else {
+                return nil
+            }
+
+            let asset = MDLAsset(url: url)
+            guard asset.count > 0 else { return nil }
+            let node = SCNNode(mdlObject: asset.object(at: 0))
+            node.name = fileName
+            cache[fileName] = node
+            return Self.deepClone(node)
         }
-        
-        guard let url = Bundle.main.url(forResource: fileName.replacingOccurrences(of: ".obj", with: ""),
-                                         withExtension: "obj") else {
-            return nil
-        }
-        
-        let asset = MDLAsset(url: url)
-        guard asset.count > 0 else { return nil }
-        let mdlObject = asset.object(at: 0)
-        let node = SCNNode(mdlObject: mdlObject)
-        node.name = fileName
-        
-        queue.sync { cache[fileName] = node }
-        return Self.deepClone(node)
     }
     
     /// Deep clone: copies geometry + materials so mutations don't bleed across modes

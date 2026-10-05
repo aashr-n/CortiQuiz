@@ -1,5 +1,16 @@
 import SceneKit
 
+// MARK: - Background Work
+
+/// Runs synchronous, CPU-heavy work (mesh loading, slice classification) off the main actor.
+/// It's a structured call, so when the calling task is cancelled — e.g. SwiftUI's `.task`
+/// when the view disappears — `work` sees it via `Task.isCancelled` and can stop early.
+nonisolated enum Background {
+    @concurrent static func run<T>(_ work: @Sendable () -> T) async -> T {
+        work()
+    }
+}
+
 // MARK: - Shared SCNNode Material Helpers
 
 extension SCNNode {
@@ -13,19 +24,42 @@ extension SCNNode {
         }
         for child in childNodes { child.applyColor(color, doubleSided: doubleSided) }
     }
+}
 
-    /// Apply transparency to all materials.
-    nonisolated func applyTransparency(alpha: CGFloat) {
-        if let geom = geometry {
-            for mat in geom.materials {
-                mat.diffuse.contents = UIColor.white.withAlphaComponent(alpha)
-                mat.transparency = alpha
-                mat.isDoubleSided = true
-                mat.blendMode = .alpha
-                mat.writesToDepthBuffer = false
-            }
+/// Recolor structure nodes in one animated transaction. `style` maps a structure id to
+/// its color and opacity.
+func restyleNodes(
+    _ nodes: [String: SCNNode],
+    duration: TimeInterval = 0.25,
+    style: (String) -> (color: UIColor, opacity: CGFloat)
+) {
+    SCNTransaction.begin()
+    SCNTransaction.animationDuration = duration
+    for (id, node) in nodes {
+        let s = style(id)
+        node.applyColor(s.color)
+        node.opacity = s.opacity
+    }
+    SCNTransaction.commit()
+}
+
+// MARK: - Explode View
+
+/// Pushes each structure out from the brain center by `factor` × its offset. Mesh vertices
+/// are already in world space (node positions start at zero), so factor 0 is the natural layout.
+nonisolated struct ExplodeLayout {
+    var centers: [String: SCNVector3] = [:]
+    var brainCenter = SCNVector3Zero
+
+    func apply(_ factor: Float, to nodes: [String: SCNNode]) {
+        for (id, node) in nodes {
+            guard let c = centers[id] else { continue }
+            node.position = SCNVector3(
+                (c.x - brainCenter.x) * factor,
+                (c.y - brainCenter.y) * factor,
+                (c.z - brainCenter.z) * factor
+            )
         }
-        for child in childNodes { child.applyTransparency(alpha: alpha) }
     }
 }
 
@@ -61,7 +95,7 @@ extension SCNNode {
     }
 
     /// Update clip uniforms without shader recompilation.
-    func updateClipUniforms(viewClipZ: Float, thickness: Float) {
+    nonisolated func updateClipUniforms(viewClipZ: Float, thickness: Float) {
         if let geom = geometry {
             for mat in geom.materials {
                 mat.setValue(NSNumber(value: viewClipZ), forKey: "clipZ")

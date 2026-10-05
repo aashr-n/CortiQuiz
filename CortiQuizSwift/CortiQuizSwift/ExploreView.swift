@@ -5,99 +5,92 @@ import SceneKit
 
 @MainActor @Observable
 final class ExploreViewModel {
-    var allStructures: [BrainStructure] = []
     var brainStructures: [BrainStructure] = []
     var scene = SCNScene()
     var selectedStructure: BrainStructure?
     var searchQuery = ""
-    var explodeFactor: Float = 0
+    private(set) var explodeFactor: Float = 0
     var isLoading = true
+    var loadFailed = false
     var recenterTrigger = false
-    
+
+    private var structuresByID: [String: BrainStructure] = [:]
     private var structureNodes: [String: SCNNode] = [:]
-    private var originalPositions: [String: SCNVector3] = [:]
-    private var brainCenter = SCNVector3Zero
-    private var setupStarted = false
-    
+    private var explodeLayout = ExplodeLayout()
+    private var hasLoaded = false
+
     var searchResults: [BrainStructure] {
         guard !searchQuery.isEmpty else { return [] }
         let q = searchQuery.lowercased()
         return Array(brainStructures.filter { $0.name.lowercased().contains(q) }.prefix(10))
     }
-    
-    func setup() {
-        guard !setupStarted else { return }
-        setupStarted = true
-        isLoading = true
 
-        Task.detached { [weak self] in
-            let loaded = BrainSceneLoader.load { node, s in
+    /// Builds the scene off the main actor. Runs from SwiftUI's `.task`, so leaving the
+    /// screen mid-load cancels it and a later visit starts over.
+    func load() async {
+        guard !hasLoaded else { return }
+        let loaded = await Background.run {
+            BrainSceneLoader.load { node, s in
                 node.applyColor(UIColor(s.color))
             }
-
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.allStructures = loaded.allStructures
-                self.brainStructures = loaded.structures
-                self.scene = loaded.scene
-                self.structureNodes = loaded.nodes
-                self.originalPositions = loaded.nodeCenters
-                self.brainCenter = loaded.center
-                self.isLoading = false
-            }
         }
+        guard !Task.isCancelled else { return }
+        hasLoaded = true
+        guard !loaded.structures.isEmpty else {
+            loadFailed = true
+            isLoading = false
+            return
+        }
+
+        brainStructures = loaded.structures
+        structuresByID = Dictionary(uniqueKeysWithValues: loaded.structures.map { ($0.id, $0) })
+        scene = loaded.scene
+        structureNodes = loaded.nodes
+        explodeLayout = loaded.explodeLayout
+        isLoading = false
     }
-    
+
     func select(_ structure: BrainStructure) {
         Theme.tapHaptic()
         selectedStructure = structure
-        
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.25
-        for (id, node) in structureNodes {
-            if id == structure.id {
-                node.applyColor(UIColor.systemGreen)
-                node.opacity = 1.0
-            } else {
-                node.applyColor(UIColor(white: 0.5, alpha: 1.0))
-                node.opacity = 0.15
-            }
-        }
-        SCNTransaction.commit()
-    }
-    
-    func selectByID(_ id: String) {
-        if let s = brainStructures.first(where: { $0.id == id }) {
-            select(s)
+        restyleNodes(structureNodes) { id in
+            id == structure.id
+                ? (SceneColors.selection, 1.0)
+                : (SceneColors.ghost, SceneColors.ghostOpacity)
         }
     }
-    
+
+    /// Hits arrive nearest-first. While something is selected everything else is a faded
+    /// ghost, so prefer the first fully opaque hit — that keeps the highlighted structure
+    /// tappable through the translucent cortex in front of it.
+    func handleTap(_ hits: [SCNHitTestResult]) {
+        let ids = hits.compactMap { structureID(for: $0.node) }
+        let opaque = ids.first { (structureNodes[$0]?.opacity ?? 0) > 0.99 }
+        if let id = opaque ?? ids.first, let structure = structuresByID[id] {
+            select(structure)
+        }
+    }
+
+    /// The structure a hit belongs to (the hit node may be a child of the structure node).
+    private func structureID(for node: SCNNode) -> String? {
+        var current: SCNNode? = node
+        while let n = current {
+            if let name = n.name, structureNodes[name] != nil { return name }
+            current = n.parent
+        }
+        return nil
+    }
+
     func clearSelection() {
         selectedStructure = nil
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.25
-        for (id, node) in structureNodes {
-            if let s = brainStructures.first(where: { $0.id == id }) {
-                node.applyColor(UIColor(s.color))
-                node.opacity = 1.0
-            }
-        }
-        SCNTransaction.commit()
-    }
-    
-    func updateExplode() {
-        let factor = explodeFactor
-        for (id, node) in structureNodes {
-            guard let orig = originalPositions[id] else { continue }
-            let dx = (orig.x - brainCenter.x) * factor
-            let dy = (orig.y - brainCenter.y) * factor
-            let dz = (orig.z - brainCenter.z) * factor
-            node.position = SCNVector3(dx, dy, dz)
+        restyleNodes(structureNodes) { id in
+            (structuresByID[id].map { UIColor($0.color) } ?? SceneColors.ghost, 1.0)
         }
     }
-    
-    func resetForReentry() {
-        setupStarted = false
+
+    func setExplode(_ factor: Float) {
+        explodeFactor = factor
+        explodeLayout.apply(factor, to: structureNodes)
     }
 }
 
@@ -105,45 +98,25 @@ final class ExploreViewModel {
 
 struct ExploreView: View {
     @State private var vm = ExploreViewModel()
-    
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
-            if vm.isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
-                    Text("Loading brain atlas…")
-                        .foregroundColor(Theme.textSecondary)
-                }
+
+            if vm.isLoading || vm.loadFailed {
+                LoadingStateView(message: "Loading brain atlas…", failed: vm.loadFailed)
             } else {
                 ZStack(alignment: .bottomTrailing) {
-                    SceneKitView(scene: vm.scene, onTap: { hit in
-                        if let name = hit.node.name {
-                            vm.selectByID(name)
-                        } else if let parent = hit.node.parent?.name {
-                            vm.selectByID(parent)
-                        }
+                    SceneKitView(scene: vm.scene, onTap: { hits in
+                        vm.handleTap(hits)
                     }, recenterTrigger: vm.recenterTrigger)
                     .ignoresSafeArea(edges: .bottom)
                     .accessibilityLabel("3D brain atlas. Tap a structure to select it.")
 
-                    Button {
-                        vm.recenterTrigger.toggle()
-                    } label: {
-                        Image(systemName: "scope")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .padding(10)
-                            .background(Color.white.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                    .accessibilityLabel("Recenter camera")
-                    .padding(12)
+                    RecenterButton { vm.recenterTrigger.toggle() }
+                        .padding(12)
                 }
-                
+
                 VStack {
                     HStack {
                         HStack {
@@ -156,7 +129,7 @@ struct ExploreView: View {
                         .padding(10)
                         .background(Theme.bgInput)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
-                        
+
                         if vm.selectedStructure != nil {
                             Button {
                                 vm.clearSelection()
@@ -164,11 +137,12 @@ struct ExploreView: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(Theme.textSecondary)
                             }
+                            .accessibilityLabel("Clear selection")
                         }
                     }
                     .padding(.horizontal)
                     .padding(.top, 4)
-                    
+
                     if !vm.searchResults.isEmpty {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 0) {
@@ -193,29 +167,12 @@ struct ExploreView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .padding(.horizontal)
                     }
-                    
+
                     Spacer()
-                    
-                    HStack {
-                        Image(systemName: "arrow.down.right.and.arrow.up.left")
-                            .foregroundColor(Theme.textSecondary)
-                            .font(Theme.captionFont)
-                        Slider(value: Binding(
-                            get: { vm.explodeFactor },
-                            set: { vm.explodeFactor = $0; vm.updateExplode() }
-                        ), in: 0...3)
-                        .tint(Theme.accent)
-                        .accessibilityLabel("Explode view")
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .foregroundColor(Theme.textSecondary)
-                            .font(Theme.captionFont)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 6)
-                    .background(Theme.bgCard)
-                    .clipShape(Capsule())
-                    .padding(.horizontal, 40)
-                    
+
+                    ExplodeSlider(value: Binding(get: { vm.explodeFactor }, set: { vm.setExplode($0) }))
+                        .padding(.horizontal, 40)
+
                     if let s = vm.selectedStructure {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(s.name)
@@ -247,7 +204,6 @@ struct ExploreView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .onAppear { vm.setup() }
-        .onDisappear { vm.resetForReentry() }
+        .task { await vm.load() }
     }
 }

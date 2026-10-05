@@ -2,9 +2,10 @@ import SwiftUI
 
 // MARK: - Progress Store
 
-/// Lightweight, persistent learning record shared by both quiz modes.
-/// Tracks per-structure accuracy (so we can surface weak spots), lifetime totals,
-/// and the best answer streak. Backed by `UserDefaults` as a single JSON blob.
+/// Lightweight, persistent learning record shared by every study mode.
+/// Tracks per-structure accuracy (so we can surface weak spots), lifetime totals, the best
+/// single-session streak, and the structures Learn mode flagged for review.
+/// Backed by `UserDefaults` as a single JSON blob.
 @MainActor
 @Observable
 final class ProgressStore {
@@ -18,31 +19,44 @@ final class ProgressStore {
     }
 
     private(set) var stats: [String: StructureStat] = [:]   // keyed by baseName
+    /// Longest run of correct answers within one quiz session.
     private(set) var bestStreak: Int = 0
     private(set) var totalAnswered: Int = 0
     private(set) var totalCorrect: Int = 0
-    /// Resets to 0 on a wrong answer; not persisted (best streak is what we keep).
-    private(set) var currentStreak: Int = 0
+    /// baseNames the user marked "Study again" in Learn mode, oldest first. Quizzes ask these
+    /// first; a structure leaves the queue once it's answered correctly in a quiz.
+    private(set) var reviewQueue: [String] = []
 
+    private let defaults: UserDefaults
     private let defaultsKey = "cortiquiz.progress.v1"
 
-    init() { load() }
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        load()
+    }
 
-    /// Record one answered question.
-    func record(baseName: String, correct: Bool) {
+    /// Record one answered quiz question. `streak` is the session's current streak
+    /// after this answer.
+    func record(baseName: String, correct: Bool, streak: Int) {
         var stat = stats[baseName] ?? StructureStat()
         stat.seen += 1
         if correct {
             stat.correct += 1
-            currentStreak += 1
             totalCorrect += 1
-            bestStreak = max(bestStreak, currentStreak)
+            reviewQueue.removeAll { $0 == baseName }
         } else {
             stat.wrong += 1
-            currentStreak = 0
         }
         stats[baseName] = stat
         totalAnswered += 1
+        bestStreak = max(bestStreak, streak)
+        save()
+    }
+
+    /// Learn mode: queue a structure to come up first in the next quiz.
+    func flagForReview(_ baseName: String) {
+        guard !reviewQueue.contains(baseName) else { return }
+        reviewQueue.append(baseName)
         save()
     }
 
@@ -65,6 +79,8 @@ final class ProgressStore {
         var bestStreak: Int
         var totalAnswered: Int
         var totalCorrect: Int
+        /// Optional so blobs saved before Learn-mode review existed still decode.
+        var reviewQueue: [String]?
     }
 
     private func save() {
@@ -72,20 +88,22 @@ final class ProgressStore {
             stats: stats,
             bestStreak: bestStreak,
             totalAnswered: totalAnswered,
-            totalCorrect: totalCorrect
+            totalCorrect: totalCorrect,
+            reviewQueue: reviewQueue
         )
         if let data = try? JSONEncoder().encode(snapshot) {
-            UserDefaults.standard.set(data, forKey: defaultsKey)
+            defaults.set(data, forKey: defaultsKey)
         }
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: defaultsKey),
+        guard let data = defaults.data(forKey: defaultsKey),
               let snapshot = try? JSONDecoder().decode(Persisted.self, from: data)
         else { return }
         stats = snapshot.stats
         bestStreak = snapshot.bestStreak
         totalAnswered = snapshot.totalAnswered
         totalCorrect = snapshot.totalCorrect
+        reviewQueue = snapshot.reviewQueue ?? []
     }
 }
