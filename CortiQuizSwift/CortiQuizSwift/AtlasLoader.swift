@@ -110,7 +110,7 @@ nonisolated final class ModelCache: @unchecked Sendable {
     }
     
     /// Deep clone: copies geometry + materials so mutations don't bleed across modes
-    private static func deepClone(_ node: SCNNode) -> SCNNode {
+    static func deepClone(_ node: SCNNode) -> SCNNode {
         let clone = node.clone()
         if let geom = clone.geometry {
             clone.geometry = geom.copy() as? SCNGeometry

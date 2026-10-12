@@ -68,17 +68,26 @@ nonisolated enum SceneColors {
     static let pairedCorrectOpacity: CGFloat = 0.75
 
     // MRI modes
-    static let miniBrain = UIColor(white: 0.7, alpha: 0.35)
-    static let slicePlane = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 0.40)
+    static let miniBrain = UIColor(white: 0.7, alpha: 0.12)
+    /// Mini-brain slice plane: where it's in front of the brain, and (fainter) through it.
+    static let slicePlane = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 0.70)
+    static let slicePlaneXRay = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 0.30)
+    /// Behind and around the slice image. Opaque: the slice scene paints it over whatever
+    /// lies outside every structure.
+    static let sliceBackground = UIColor(white: 0.05, alpha: 1.0)
     /// MRI quiz target pulses between these two.
     static let mriTarget = UIColor.white
     static let mriTargetDim = UIColor(red: 0.0, green: 0.82, blue: 0.78, alpha: 1.0)
 
-    /// Non-target regions in the MRI quiz slice: same hue, much darker.
-    static func mriDimmed(_ color: UIColor) -> UIColor {
+    /// Regions other than the quiz target or the tapped structure: same hue, faded toward
+    /// the slice background (`brightness` 0 is background, 1 the original color).
+    static func mriDimmed(_ color: UIColor, brightness: CGFloat = 0.2) -> UIColor {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         color.getRed(&r, green: &g, blue: &b, alpha: &a)
-        return UIColor(red: r * 0.2, green: g * 0.2, blue: b * 0.2, alpha: 0.4)
+        var bg: CGFloat = 0
+        sliceBackground.getWhite(&bg, alpha: nil)
+        func fade(_ c: CGFloat) -> CGFloat { bg + (c - bg) * brightness }
+        return UIColor(red: fade(r), green: fade(g), blue: fade(b), alpha: 1)
     }
 }
 

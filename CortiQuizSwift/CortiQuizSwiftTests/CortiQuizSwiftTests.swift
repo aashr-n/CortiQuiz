@@ -272,19 +272,17 @@ struct ExplodeLayoutTests {
 struct SliceClassifierTests {
 
     @Test func pixelScaleMatchesTheOrthographicCamera() {
-        // SceneKit's orthographicScale is half the visible height: 180 mm across 512 px.
-        #expect(abs(MRISlicing.pixelsPerUnit - 512.0 / 180.0) < 0.0001)
+        // SceneKit's orthographicScale is half the visible height: 190 mm across 512 px.
+        #expect(abs(MRISlicing.pixelsPerUnit - 512.0 / 190.0) < 0.0001)
     }
 
     @Test func snapshotRendersAtThePredictedScale() throws {
-        // A 90-unit box should fill half of the slice snapshot.
+        // A 95-unit box should fill half of the slice snapshot.
         let scene = SCNScene()
-        let box = SCNNode(geometry: SCNBox(width: 90, height: 90, length: 1, chamferRadius: 0))
-        box.geometry?.firstMaterial?.diffuse.contents = UIColor.white
-        box.geometry?.firstMaterial?.lightingModel = .constant
+        let box = SCNNode(geometry: SCNBox(width: 95, height: 95, length: 4, chamferRadius: 0))
         scene.rootNode.addChildNode(box)
 
-        let image = SliceRenderer(scene: scene, nodes: [box]).snapshot(antialiased: false)
+        let image = SliceRenderer(scene: scene, nodes: [box], colors: [.white]).snapshot(antialiased: false)
         let cg = try #require(image.cgImage)
         let width = cg.width, height = cg.height
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -346,6 +344,104 @@ struct SliceClassifierTests {
             #expect(s.footprint.maxDimensionPixels >= SliceClassifier.minDimensionPixels)
             #expect(s.footprint.areaPixels >= SliceClassifier.minAreaPixels)
             #expect((bmin.z...bmax.z).contains(s.coord))
+            #expect((bmin.z...bmax.z).contains(s.cutCoord))
+        }
+    }
+}
+
+// MARK: - MRI rendering
+
+@MainActor
+struct SliceRendererTests {
+
+    /// A 20 mm cube centered at `center`, in a scene of its own.
+    private func cube(at center: SIMD3<Float>, in scene: SCNScene) -> SCNNode {
+        let node = SCNNode(geometry: SCNBox(width: 20, height: 20, length: 20, chamferRadius: 0))
+        node.simdPosition = center
+        scene.rootNode.addChildNode(node)
+        return node
+    }
+
+    @Test func imageEdgesMatchTheirLabels() {
+        let direction: [String: SIMD3<Float>] = [
+            "R": SIMD3(1, 0, 0), "L": SIMD3(-1, 0, 0),
+            "A": SIMD3(0, 1, 0), "P": SIMD3(0, -1, 0),
+            "S": SIMD3(0, 0, 1), "I": SIMD3(0, 0, -1),
+        ]
+        for axis in MRIAxis.allCases {
+            let cam = SCNNode()
+            MRISlicing.orientCamera(cam, for: axis, center: SIMD3(3, -7, 11))
+            let e = axis.edgeLabels
+            #expect(simd_distance(cam.simdWorldUp, direction[e.top]!) < 0.001, "\(axis.title) top")
+            #expect(simd_distance(-cam.simdWorldUp, direction[e.bottom]!) < 0.001, "\(axis.title) bottom")
+            #expect(simd_distance(cam.simdWorldRight, direction[e.right]!) < 0.001, "\(axis.title) right")
+            #expect(simd_distance(-cam.simdWorldRight, direction[e.left]!) < 0.001, "\(axis.title) left")
+        }
+    }
+
+    @Test func tapPickingFindsTheCutStructure() throws {
+        // Two cubes side by side on X; axial slices are radiological, so +X (patient right)
+        // shows on screen left.
+        let scene = SCNScene()
+        let right = cube(at: SIMD3(40, 0, 0), in: scene)
+        let left = cube(at: SIMD3(-40, 0, 0), in: scene)
+        let renderer = SliceRenderer(scene: scene, nodes: [right, left], colors: [.red, .blue])
+        renderer.orient(.axial)
+        renderer.setCut(coord: 0)
+
+        let half = CGFloat(40 / (2 * MRISlicing.orthographicScale))
+        #expect(renderer.structureIndex(at: CGPoint(x: 0.5 - half, y: 0.5)) == 0)
+        #expect(renderer.structureIndex(at: CGPoint(x: 0.5 + half, y: 0.5)) == 1)
+        #expect(renderer.structureIndex(at: CGPoint(x: 0.5, y: 0.5)) == nil)
+        // Cut above both cubes: nothing to pick.
+        renderer.setCut(coord: 15)
+        #expect(renderer.structureIndex(at: CGPoint(x: 0.5 - half, y: 0.5)) == nil)
+    }
+
+    @Test func cutFillsTheCrossSectionInItsColor() throws {
+        // Anterior cube: in an axial slice it shows filled, in the top half of the image.
+        let scene = SCNScene()
+        let node = cube(at: SIMD3(0, 40, 0), in: scene)
+        let renderer = SliceRenderer(scene: scene, nodes: [node], colors: [.white])
+        renderer.orient(.axial)
+        renderer.setCut(coord: 0)
+        let image = renderer.snapshot(antialiased: false)
+
+        let half = CGFloat(40 / (2 * MRISlicing.orthographicScale))
+        let inside = try #require(image.rgb(atUnitPoint: CGPoint(x: 0.5, y: 0.5 - half)))
+        let mirrored = try #require(image.rgb(atUnitPoint: CGPoint(x: 0.5, y: 0.5 + half)))
+        #expect(inside.r > 200 && inside.g > 200 && inside.b > 200, "\(inside)")
+        #expect(mirrored.r < 40, "\(mirrored)")
+    }
+
+    @Test func idColorsRoundTrip() {
+        for index in 0..<511 {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
+            SliceRenderer.idColor(index).getRed(&r, green: &g, blue: &b, alpha: nil)
+            let rgb = (r: UInt8((r * 255).rounded()), g: UInt8((g * 255).rounded()), b: UInt8((b * 255).rounded()))
+            #expect(SliceRenderer.index(fromID: rgb) == index)
+        }
+        // The slice background decodes as "no structure".
+        #expect(SliceRenderer.index(fromID: (r: 13, g: 13, b: 13)) == nil)
+    }
+
+    @Test func locationLabelsUseRASDirections() {
+        #expect(MRIAxis.axial.locationLabel(12.4) == "S 12 mm")
+        #expect(MRIAxis.axial.locationLabel(-30) == "I 30 mm")
+        #expect(MRIAxis.coronal.locationLabel(5) == "A 5 mm")
+        #expect(MRIAxis.sagittal.locationLabel(-3) == "L 3 mm")
+        #expect(MRIAxis.sagittal.locationLabel(0.2) == "0 mm")
+    }
+
+    @Test func slicePlaneLiesInTheSlice() {
+        var bounds = MiniBrainBounds()
+        (bounds.minX, bounds.maxX, bounds.minY, bounds.maxY, bounds.minZ, bounds.maxZ) = (-60, 70, -100, 80, -90, 70)
+        let plane = SCNNode()
+        for axis in MRIAxis.allCases {
+            MRISlicing.placePlane(plane, axis: axis, coord: 12, bounds: bounds)
+            let normal = plane.simdWorldFront
+            #expect(abs(abs(simd_dot(normal, MRISlicing.axisVector(axis))) - 1) < 0.001, "\(axis.title)")
+            #expect(abs(simd_dot(plane.simdWorldPosition, MRISlicing.axisVector(axis)) - 12) < 0.001)
         }
     }
 }

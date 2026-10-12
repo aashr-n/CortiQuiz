@@ -108,6 +108,23 @@ final class CortiQuizSwiftUITests: XCTestCase {
     }
 
     @MainActor
+    func testMRIModeNamesATappedRegion() throws {
+        let app = open("MRI Mode")
+        let slice = app.descendants(matching: .any)["mriSlice"]
+        XCTAssertTrue(slice.waitForExistence(timeout: loadTimeout))
+
+        // Deep in the right cerebral white matter on the mid-axial slice (radiological: right
+        // is on screen left), well clear of the unlabeled gaps between structures.
+        slice.coordinate(withNormalizedOffset: CGVector(dx: 0.37, dy: 0.53)).tap()
+        let clear = app.buttons["Clear selection"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5))
+        attachScreenshot(app, "MRI tapped region")
+
+        clear.tap()
+        XCTAssertTrue(clear.waitForNonExistence(timeout: 5))
+    }
+
+    @MainActor
     func testMRIQuizAnswersAQuestion() throws {
         let app = open("MRI Quiz")
         XCTAssertTrue(app.staticTexts["Identify the highlighted region"].waitForExistence(timeout: loadTimeout))

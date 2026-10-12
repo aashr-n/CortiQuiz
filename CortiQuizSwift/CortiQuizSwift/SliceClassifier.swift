@@ -109,6 +109,10 @@ nonisolated struct SliceCandidate: Sendable {
     let coord: Float
     let thickness: Float
     let footprint: SliceFootprint
+
+    /// Where MRI Quiz cuts: the middle of the slab `[coord - thickness, coord]` the
+    /// footprint was measured over.
+    var cutCoord: Float { coord - thickness / 2 }
 }
 
 nonisolated struct TargetCandidate: Sendable {

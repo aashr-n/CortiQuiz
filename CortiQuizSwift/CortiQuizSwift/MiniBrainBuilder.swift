@@ -9,14 +9,19 @@ nonisolated struct MiniBrainBounds {
     var maxY: Float = -.greatestFiniteMagnitude
     var minZ: Float = .greatestFiniteMagnitude
     var maxZ: Float = -.greatestFiniteMagnitude
-    
+
     var maxExtent: Float {
         max(maxX - minX, maxY - minY, maxZ - minZ)
+    }
+
+    var center: SIMD3<Float> {
+        SIMD3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
     }
 }
 
 nonisolated struct MiniBrainResult {
     let scene: SCNScene
+    /// Unit square; place it with `MRISlicing.placePlane`.
     let planeNode: SCNNode
     let nodeMap: [String: SCNNode]
 }
@@ -45,16 +50,14 @@ enum MiniBrainBuilder {
             nodeMap[s.id] = node
         }
 
-        // Slice plane
-        let planeSize = bounds.maxExtent * 0.8
-        let plane = SCNPlane(width: CGFloat(planeSize), height: CGFloat(planeSize))
-        let planeMat = SCNMaterial()
-        planeMat.diffuse.contents = SceneColors.slicePlane
-        planeMat.isDoubleSided = true
-        planeMat.blendMode = .alpha
-        plane.materials = [planeMat]
-        let planeNode = SCNNode(geometry: plane)
+        // Slice plane, drawn twice: depth-tested, so the part in front of the brain reads as
+        // in front, and faintly on top of everything, so the part inside the brain stays visible.
+        let planeNode = SCNNode(geometry: planeGeometry(SceneColors.slicePlane, onTop: false))
         planeNode.name = "slicePlane"
+        planeNode.renderingOrder = 99
+        let xRay = SCNNode(geometry: planeGeometry(SceneColors.slicePlaneXRay, onTop: true))
+        xRay.renderingOrder = 100
+        planeNode.addChildNode(xRay)
         scene.rootNode.addChildNode(planeNode)
 
         // Camera
@@ -64,9 +67,9 @@ enum MiniBrainBuilder {
         cam.zFar = 2000
         let camNode = SCNNode()
         camNode.camera = cam
-        // Oblique view for mini brain
-        camNode.position = SCNVector3(200, 200, 100)
-        camNode.look(at: SCNVector3(0, 0, (bounds.minZ + bounds.maxZ)/2), up: SCNVector3(0, 0, 1), localFront: SCNVector3(0, 0, -1))
+        // Oblique view from front-right-above, aimed at the brain's center
+        camNode.simdPosition = bounds.center + SIMD3(200, 200, 110)
+        camNode.simdLook(at: bounds.center, up: SIMD3(0, 0, 1), localFront: SIMD3(0, 0, -1))
         camNode.name = "miniCamera"
         scene.rootNode.addChildNode(camNode)
 
@@ -86,5 +89,36 @@ enum MiniBrainBuilder {
         scene.rootNode.addChildNode(dir)
 
         return Result(scene: scene, planeNode: planeNode, nodeMap: nodeMap)
+    }
+
+    nonisolated private static func planeGeometry(_ color: UIColor, onTop: Bool) -> SCNGeometry {
+        let plane = SCNPlane(width: 1, height: 1)
+        let mat = SCNMaterial()
+        mat.diffuse.contents = color
+        mat.lightingModel = .constant
+        mat.isDoubleSided = true
+        mat.blendMode = .alpha
+        if onTop {
+            mat.readsFromDepthBuffer = false
+            mat.writesToDepthBuffer = false
+        }
+        plane.materials = [mat]
+        return plane
+    }
+
+    /// Color one mini-brain structure, or restore its gray shell with nil. Highlights draw on
+    /// top of the translucent brain so deep structures stay visible.
+    static func highlight(_ node: SCNNode, color: UIColor?) {
+        node.applyColor(color ?? SceneColors.miniBrain)
+        drawOnTop(node, color != nil)
+    }
+
+    private static func drawOnTop(_ node: SCNNode, _ onTop: Bool) {
+        node.renderingOrder = onTop ? 50 : 0
+        for mat in node.geometry?.materials ?? [] {
+            mat.readsFromDepthBuffer = !onTop
+            mat.writesToDepthBuffer = !onTop
+        }
+        for child in node.childNodes { drawOnTop(child, onTop) }
     }
 }

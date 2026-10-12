@@ -63,46 +63,55 @@ nonisolated struct ExplodeLayout {
     }
 }
 
-// MARK: - MRI Clip Shader (Uniform-Based)
+// MARK: - MRI Cut Shader (Uniform-Based)
+
+/// Which faces of a closed structure mesh a slice-scene node draws.
+///
+/// Looking past the cut plane, the first surface seen from a point *inside* a structure is
+/// the inside of that structure's own wall (a back face); from a point *outside* every
+/// structure it's some structure's outer wall (a front face). Drawing back faces in the
+/// structure's color and front faces in the background color fills every cross-section
+/// solidly, using only the surface meshes.
+nonisolated enum CutFaces {
+    case inside, outside
+}
 
 extension SCNNode {
-    /// Stable shader source using uniforms — compiled once, updated via setValue.
-    nonisolated private static let clipShaderSource = """
+    /// Discards everything between the camera and the cut plane. Compiled once; moving the
+    /// cut only changes the `clipZ` uniform (view-space depth).
+    nonisolated private static let cutShaderSource = """
     #pragma arguments
     float clipZ;
-    float clipThickness;
 
     #pragma body
-    float vz = _surface.position.z;
-    if (vz > clipZ || vz < clipZ - clipThickness) {
+    if (_surface.position.z > clipZ) {
         discard_fragment();
     }
     """
 
-    /// Install the clip shader once during setup. Does NOT recompile on value changes.
-    nonisolated func installClipShader(color: UIColor) {
+    /// Install the cut shader once during setup, drawing only `faces` in a flat `color`.
+    nonisolated func installCutShader(color: UIColor, faces: CutFaces) {
         if let geom = geometry {
             for mat in geom.materials {
-                mat.shaderModifiers = [.fragment: Self.clipShaderSource]
-                mat.isDoubleSided = true
+                mat.shaderModifiers = [.fragment: Self.cutShaderSource]
+                mat.isDoubleSided = false
+                mat.cullMode = faces == .inside ? .front : .back
+                mat.lightingModel = .constant
                 mat.diffuse.contents = color
-                // Set initial uniform values
                 mat.setValue(NSNumber(value: Float(0)), forKey: "clipZ")
-                mat.setValue(NSNumber(value: Float(2)), forKey: "clipThickness")
             }
         }
-        for child in childNodes { child.installClipShader(color: color) }
+        for child in childNodes { child.installCutShader(color: color, faces: faces) }
     }
 
-    /// Update clip uniforms without shader recompilation.
-    nonisolated func updateClipUniforms(viewClipZ: Float, thickness: Float) {
+    /// Move the cut without shader recompilation.
+    nonisolated func updateClipZ(_ viewClipZ: Float) {
         if let geom = geometry {
             for mat in geom.materials {
                 mat.setValue(NSNumber(value: viewClipZ), forKey: "clipZ")
-                mat.setValue(NSNumber(value: thickness), forKey: "clipThickness")
             }
         }
-        for child in childNodes { child.updateClipUniforms(viewClipZ: viewClipZ, thickness: thickness) }
+        for child in childNodes { child.updateClipZ(viewClipZ) }
     }
 
     /// Update diffuse color without touching the shader.

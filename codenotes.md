@@ -15,14 +15,14 @@
 | `BrainStructure.swift` | JSON decoding (`AtlasEntry`) + domain model (`BrainStructure`, `baseName` for L/R pairing) |
 | `AtlasLoader.swift` | Parses `atlasStructure.json` once (lazy static), builds hierarchy; `ModelCache` loads + deep-clones OBJ nodes on a serial queue |
 | `BrainSceneLoader.swift` | Shared "brain-only structures → cloned nodes → bounds/centers" scene build used by every mode; honors task cancellation |
-| `SceneUtilities.swift` | `Background.run` (`@concurrent` off-main work), `restyleNodes`, `ExplodeLayout`, clip-shader `SCNNode` helpers |
+| `SceneUtilities.swift` | `Background.run` (`@concurrent` off-main work), `restyleNodes`, `ExplodeLayout`, MRI cut-shader `SCNNode` helpers (`CutFaces`) |
 | `Theme.swift` | Design tokens (SwiftUI) + `SceneColors` (SceneKit material colors, nonisolated), haptics, `PressableStyle`, `Color.fromRGB` |
 | `SharedViews.swift` | `LoadingStateView`, `ExplodeSlider`, `RecenterButton`, `SceneControlsBar`, `.bottomCard()` |
 | `QuizSupport.swift` | `QuizOptionBuilder` (distractors), `QuizTargetPicker` (flagged → weak → unasked, by baseName), `QuizSession`, `AnswerOptionsView`, `ScoreLabel`, `QuizResultsView` |
 | `ProgressStore.swift` | Persistent stats, best session streak, Learn-mode review queue (UserDefaults JSON; injectable defaults for tests) |
-| `MRISlicing.swift` | `MRIAxis`, slice camera/clip/plane geometry + shared constants, `SliceRenderer` (snapshots on a private queue) |
+| `MRISlicing.swift` | `MRIAxis` (edge labels, slice-location text), slice camera/cut/plane geometry + shared constants, `SliceRenderer` (filled-cut snapshots + tap picking on a private queue) |
 | `SliceClassifier.swift` | Reads triangles from loaded SceneKit geometry, scores slice visibility for MRI Quiz, caches results per session |
-| `MiniBrainBuilder.swift` | Gray translucent mini-brain scene + slice plane for the MRI modes |
+| `MiniBrainBuilder.swift` | Gray translucent mini-brain scene + two-layer slice plane for the MRI modes; `highlight` draws a structure on top |
 | `SceneKitView.swift` | `UIViewRepresentable` wrapping `SCNView` — camera/lights via `ensureSceneSetup`, tap → all hits |
 | `MainMenuView.swift` | `AppMode` enum + menu; destinations built lazily via `navigationDestination` |
 | `LearnView.swift` / `QuizView.swift` / `ExploreView.swift` / `MRIView.swift` / `MRIQuizView.swift` | The five modes. Each view model loads in `load() async`, started by `.task` (cancelled on disappear) |
@@ -39,7 +39,8 @@
 - iOS deployment target is 26.2; Swift 5 language mode with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and approachable concurrency
 - Quiz L/R merging strips prefixes from names for answer matching
 - Explode view: factor 0 is the natural layout (vertices are world-space; node positions are offsets)
-- SceneKit `orthographicScale` is half the visible height: the slice camera shows 180 mm across 512 px (`MRISlicing.pixelsPerUnit`)
+- SceneKit `orthographicScale` is half the visible height: the slice camera shows 190 mm across 512 px (`MRISlicing.pixelsPerUnit`)
+- SceneKit's `look(at:)` can't turn a node's default −Z view to face +Z (a 180° turn) and leaves it looking away; `MRISlicing.orientCamera` sets the camera basis directly
 - iPhone is portrait-only; the app forces dark appearance (`UIUserInterfaceStyle = Dark`)
 
 ## Bug Fixes Applied (2026-03-03)
@@ -145,3 +146,12 @@
 - **Loading**: `.task { await vm.load() }` replaces `Task.detached` + `setupStarted`/`resetForReentry`; leaving a mode mid-load cancels it.
 - **Misc**: single haptic per answer, Reduce Motion respected (MRI pulse, menu), load-failure message instead of an endless spinner, MRI wrong answers mark both hemispheres, Explore taps prefer the opaque (selected) structure, iPhone portrait-only, forced dark mode, dead code removed, shared UI components extracted.
 - **Tests**: unit tests for atlas filtering, option builder, target picker, session, progress persistence (incl. legacy blobs), explode layout, slice scale (rendered), footprint math, and mesh extraction; UI smoke tests for every mode.
+
+## MRI Mode Overhaul (2026-10-11)
+- **Radiological orientation**: axial slices were upside down (anterior at the bottom). Axial is now seen from the feet and sagittal from the patient's left (face toward screen left); coronal was already radiological. A/P/S/I/R/L letters sit at the image edges (`MRIAxis.edgeLabels`), and a unit test checks them against the camera basis.
+- **Framing**: the slice camera centers on the brain's bounds (it was centered on the origin, cutting ~7 mm off the occipital pole) and shows 190 mm instead of 180 mm.
+- **Filled cross-sections**: the 2 mm slab clip showed only each structure's shell. The cut shader now discards everything in front of the plane; each structure draws its back faces (inside walls) in its color, and a background-colored twin draws front faces (outer walls). The twins sit `SliceRenderer.outsideDepthPush` (1 mm) deeper so a structure's inner wall beats a neighbor's coincident outer wall. 0.5 mm left black cracks in white matter; 2 mm let thin structures bleed through. Known leftovers: dark gaps where the cut point is inside no mesh (unlabeled space, or where neighboring smoothed meshes don't quite meet; taps there select nothing), and faint outlines of structures behind the cut in those gaps and below the brain.
+- **Tap to identify**: `SliceRenderer.structureIndex(at:)` renders a frame with index-encoded flat colors (3 bits per channel) and reads one pixel. MRI Mode highlights the tapped structure (green, others dimmed) in every slice and on the mini brain, and shows its name and hierarchy.
+- **MRI Mode UI**: full-width slice (mini brain moved below it, still not overlapping), pinch-zoom up to 4× with pan and a reset button, 1024 px settled frames, slice location in atlas mm ("S 12 mm"), ±1 mm step buttons (hold to repeat).
+- **Mini brain**: shells at 12% opacity; slice plane sized to the brain's cross-section and drawn twice (depth-tested, plus faint on top) so it stays visible inside the brain; camera centered on the brain; highlighted structures draw on top.
+- **MRI Quiz**: same renderer, so targets are solid filled regions; cuts at the middle of the classified slab (`SliceCandidate.cutCoord`); dimmed regions are opaque; header shows the slice location in mm; orientation letters.

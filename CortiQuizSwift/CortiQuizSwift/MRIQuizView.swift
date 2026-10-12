@@ -17,7 +17,8 @@ final class MRIQuizViewModel {
     var loadFailed = false
     /// True while the next question's slice renders; "Next" is disabled meanwhile.
     var isPreparing = false
-    var slicePosition: Float = 0.5
+    /// World coordinate (mm) of the cut along `activeAxis`.
+    var sliceCoord: Float = 0
     var miniBrainScene = SCNScene()
     var activeAxis: MRIAxis = .axial
 
@@ -42,14 +43,17 @@ final class MRIQuizViewModel {
     func load() async {
         guard !hasLoaded else { return }
         let assets = await Background.run {
-            let loaded = BrainSceneLoader.load { node, s in
-                node.installClipShader(color: UIColor(s.color))
-            }
+            let loaded = BrainSceneLoader.load { _, _ in }
             let mini = MiniBrainBuilder.build(structures: loaded.structures, bounds: loaded.bounds)
             let candidates = SliceCandidateCache.shared.candidates {
                 SliceClassifier.classify(loaded.ordered)
             }
-            let renderer = SliceRenderer(scene: loaded.scene, nodes: loaded.ordered.map(\.node))
+            let renderer = SliceRenderer(
+                scene: loaded.scene,
+                nodes: loaded.ordered.map(\.node),
+                colors: loaded.structures.map { UIColor($0.color) },
+                center: loaded.bounds.center
+            )
             return (loaded: loaded, mini: mini, candidates: candidates, renderer: renderer)
         }
         guard !Task.isCancelled, let candidates = assets.candidates else { return }
@@ -73,7 +77,7 @@ final class MRIQuizViewModel {
             return
         }
 
-        dimmedColors = structures.map { SceneColors.mriDimmed(UIColor($0.color)) }
+        dimmedColors = assets.renderer.baseColors.map { SceneColors.mriDimmed($0) }
         miniBrainScene = assets.mini.scene
         miniNodes = assets.mini.nodeMap
         slicePlaneNode = assets.mini.planeNode
@@ -107,23 +111,22 @@ final class MRIQuizViewModel {
         Task {
             let frames = await renderer.run { r in
                 r.orient(axis)
-                r.setSlice(coord: slice.coord, thickness: slice.thickness)
+                r.setCut(coord: slice.cutCoord)
                 // Bright frame: target white, everything else dimmed.
-                for (i, node) in r.nodes.enumerated() {
-                    node.updateDiffuseColor(i == targetIndex ? SceneColors.mriTarget : dimmed[i])
-                }
-                let bright = r.snapshot()
+                var colors = dimmed
+                colors[targetIndex] = SceneColors.mriTarget
+                r.setColors(colors)
+                let bright = r.snapshot(size: MRISlicing.sharpSnapshotSize)
                 // Dim frame: only the target changes color (cross-fades into a pulse).
-                r.nodes[targetIndex].updateDiffuseColor(SceneColors.mriTargetDim)
-                return (bright: bright, dim: r.snapshot())
+                r.setColor(SceneColors.mriTargetDim, at: targetIndex)
+                return (bright: bright, dim: r.snapshot(size: MRISlicing.sharpSnapshotSize))
             }
             guard let frames else { return }
 
             selectedAnswer = nil
             showingFeedback = false
             activeAxis = axis
-            let (lo, hi) = MRISlicing.extent(bounds, for: axis)
-            slicePosition = (slice.coord - lo) / max(hi - lo, 0.0001)
+            sliceCoord = slice.cutCoord
             currentTargetID = target.id
             correctAnswer = target.baseName
             options = QuizOptionBuilder.makeOptions(target: target, pool: pool(for: axis))
@@ -131,8 +134,9 @@ final class MRIQuizViewModel {
             sliceImageDim = frames.value.dim
 
             resetMiniBrain()
-            slicePlaneNode?.eulerAngles = MRISlicing.planeEuler(for: axis)
-            slicePlaneNode?.position = MRISlicing.planePosition(forCoord: slice.coord, axis: axis)
+            if let slicePlaneNode {
+                MRISlicing.placePlane(slicePlaneNode, axis: axis, coord: slice.cutCoord, bounds: bounds)
+            }
             isPreparing = false
             isLoading = false
         }
@@ -182,16 +186,16 @@ final class MRIQuizViewModel {
 
         for (id, node) in miniNodes {
             if id == correctID {
-                node.applyColor(SceneColors.correct.withAlphaComponent(0.9))
+                MiniBrainBuilder.highlight(node, color: SceneColors.correct.withAlphaComponent(0.9))
             } else if wrongIDs.contains(id) {
-                node.applyColor(SceneColors.incorrect.withAlphaComponent(0.9))
+                MiniBrainBuilder.highlight(node, color: SceneColors.incorrect.withAlphaComponent(0.9))
             }
         }
     }
 
     private func resetMiniBrain() {
         for node in miniNodes.values {
-            node.applyColor(SceneColors.miniBrain)
+            MiniBrainBuilder.highlight(node, color: nil)
         }
     }
 }
@@ -215,7 +219,7 @@ struct MRIQuizView: View {
                     HStack {
                         ScoreLabel(score: vm.session.score, total: vm.session.answered)
                         Spacer()
-                        Text("\(vm.activeAxis.title) · \(Int(vm.slicePosition * 100))%")
+                        Text("\(vm.activeAxis.title) · \(vm.activeAxis.locationLabel(vm.sliceCoord))")
                             .font(Theme.captionFont)
                             .foregroundColor(Theme.textTertiary)
                     }
@@ -223,9 +227,7 @@ struct MRIQuizView: View {
                     .padding(.vertical, 8)
 
                     ZStack(alignment: .bottomLeading) {
-                        ZStack {
-                            Color(white: 0.05)
-
+                        SliceFrame(axis: vm.activeAxis) {
                             if let imgDim = vm.sliceImageDim {
                                 sliceImage(imgDim)
                             }
@@ -244,12 +246,7 @@ struct MRIQuizView: View {
                                 }
                             }
                         }
-                        .aspectRatio(1, contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Theme.bgCardStroke, lineWidth: 1)
-                        )
+                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel("\(vm.activeAxis.title) MRI slice with one region highlighted. Identify it.")
 
                         MiniBrainView(scene: vm.miniBrainScene)
@@ -314,7 +311,5 @@ struct MRIQuizView: View {
         Image(uiImage: image)
             .resizable()
             .scaledToFit()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(8)
     }
 }

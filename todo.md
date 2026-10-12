@@ -31,7 +31,7 @@ Follow-ups from the 2026-10-04 code review and fixes (details in `codenotes.md` 
 
 ## Not done (deliberately)
 
-- **Real MRI volumes for the MRI modes.** The repo already has a label map (`brainAtlas2017-01/volumes/labels/hncma-atlas.nrrd`, 466 KB) and 1 mm T1/T2 scans (`volumes/imaging/A1_grayT1-1mm_resample.nrrd`, 9 MB). Slicing these would give real MRI images with filled regions; today's clipped surface meshes only show each structure's shell. Picking MRI Quiz slices would become a simple voxel count. This is a new feature, not a fix.
+- **Real MRI volumes for the MRI modes.** The repo already has a label map (`brainAtlas2017-01/volumes/labels/hncma-atlas.nrrd`, 466 KB) and 1 mm T1/T2 scans (`volumes/imaging/A1_grayT1-1mm_resample.nrrd`, 9 MB). Slices now render filled (see `codenotes.md` → "MRI Mode Overhaul"), but slicing the volumes would add a real grayscale MRI underlay, remove the remaining mesh artifacts (faint outlines behind the cut), and turn tap picking and MRI Quiz slice picking into voxel lookups. This is a new feature, not a fix.
 - **Convert models to binary `.scn`.** Smaller and faster to load than text OBJ, but it changes the asset pipeline and adds many new binary files. Do it after item 2.
 - **Git LFS for `brainAtlas2017-01/` (228 MB).** It only shrinks the repo if history is rewritten and force-pushed.
 - **Cerebellar weighting.** Cerebellar lobule pieces are still about 22% of distinct quiz names. If that's too many, down-weight them in `QuizTargetPicker` (`QuizSupport.swift`).
