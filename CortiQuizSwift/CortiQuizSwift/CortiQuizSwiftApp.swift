@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct CortiQuizSwiftApp: App {
+    init() {
+        Theme.applyNavigationBarFonts()
+    }
+
     var body: some Scene {
         WindowGroup {
             MainMenuView()

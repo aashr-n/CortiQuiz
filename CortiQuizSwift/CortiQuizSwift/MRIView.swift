@@ -299,15 +299,15 @@ private struct ZoomableSlice<Key: Equatable>: View {
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) { resetZoom() }
                 } label: {
-                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    Label("Reset zoom", systemImage: "arrow.down.right.and.arrow.up.left")
+                        .labelStyle(.iconOnly)
                         .font(.footnote.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.black.opacity(0.55))
-                        .clipShape(Circle())
+                        .frame(width: 18, height: 18)
                 }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.primary)
                 .padding(4)
-                .accessibilityLabel("Reset zoom")
             }
         }
         .onChange(of: resetKey) { resetZoom() }
@@ -350,8 +350,8 @@ struct MRIView: View {
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading MRI data…", failed: vm.loadFailed)
             } else {
-                VStack(spacing: 12) {
-                    header
+                VStack(spacing: 14) {
+                    axisPicker
 
                     SliceFrame(axis: vm.activeAxis) {
                         ZoomableSlice(
@@ -364,14 +364,13 @@ struct MRIView: View {
                     .padding(.horizontal)
 
                     selectionRow
+                    Spacer(minLength: 0)
                     sliceControls
                 }
                 .padding(.top, 8)
-                .padding(.bottom, 16)
+                .padding(.bottom, 8)
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .task { await vm.load() }
     }
 
@@ -381,58 +380,43 @@ struct MRIView: View {
         return "\(base), \(s.name) highlighted"
     }
 
-    private var header: some View {
-        HStack {
-            Text("\(vm.activeAxis.title) MRI Slice")
-                .font(Theme.headingFont)
-                .foregroundColor(Theme.textPrimary)
-
-            Spacer()
-
-            Picker("Axis", selection: Binding(
-                get: { vm.activeAxis },
-                set: { vm.setAxis($0) }
-            )) {
-                ForEach(MRIAxis.allCases) { axis in
-                    Text(axis.title).tag(axis)
-                }
+    private var axisPicker: some View {
+        Picker("Slice plane", selection: Binding(
+            get: { vm.activeAxis },
+            set: { vm.setAxis($0) }
+        )) {
+            ForEach(MRIAxis.allCases) { axis in
+                Text(axis.title).tag(axis)
             }
-            .pickerStyle(.segmented)
-            .frame(width: 200)
-            .accessibilityLabel("Slice plane")
         }
+        .pickerStyle(.segmented)
+        .controlSize(.large)
         .padding(.horizontal)
     }
 
     /// Mini brain beside the tapped structure's name (or a hint).
     private var selectionRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             MiniBrainView(scene: vm.miniBrainScene)
-                .frame(width: 96, height: 96)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Theme.bgCardStroke, lineWidth: 1)
-                )
+                .frame(width: 84, height: 84)
+                .clipShape(.rect(cornerRadius: 14))
                 .accessibilityLabel("Mini brain showing slice plane location")
 
             VStack(alignment: .leading, spacing: 4) {
                 if let s = vm.selected {
                     Text(s.name)
                         .font(Theme.headingFont)
-                        .foregroundColor(Theme.textPrimary)
                     if !s.hierarchyPath.isEmpty {
-                        Text(s.hierarchyPath.joined(separator: " → "))
+                        Text(s.hierarchyPath.joined(separator: " › "))
                             .font(Theme.captionFont)
-                            .foregroundColor(Theme.textSecondary)
+                            .foregroundStyle(Theme.textSecondary)
                     }
                 } else {
-                    Text("Tap a region to name it")
-                        .font(Theme.bodyFont)
-                        .foregroundColor(Theme.textSecondary)
-                    Text("Pinch to zoom")
+                    Label("Tap a region to name it", systemImage: "hand.tap.fill")
+                        .font(Theme.bodyFont.weight(.medium))
+                    Text("Pinch to zoom, drag to pan")
                         .font(Theme.captionFont)
-                        .foregroundColor(Theme.textTertiary)
+                        .foregroundStyle(Theme.textSecondary)
                 }
             }
             .lineLimit(2)
@@ -442,42 +426,54 @@ struct MRIView: View {
                 Button {
                     vm.select(nil)
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(Theme.textSecondary)
+                    Label("Clear selection", systemImage: "xmark")
+                        .labelStyle(.iconOnly)
+                        .font(.footnote.weight(.bold))
+                        .frame(width: 18, height: 18)
                 }
-                .accessibilityLabel("Clear selection")
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .tint(.secondary)
             }
         }
+        .padding(8)
+        .padding(.trailing, 8)
+        .background(Theme.bgCard, in: .rect(cornerRadius: 22))
         .padding(.horizontal)
     }
 
     private var sliceControls: some View {
         let axis = vm.activeAxis
-        return VStack(spacing: 6) {
+        return VStack(spacing: 8) {
             HStack {
                 Text(axis.labelStart)
                 Spacer()
                 Text(axis.locationLabel(vm.sliceCoord))
                     .monospacedDigit()
+                    .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Text(axis.labelEnd)
             }
-            .font(Theme.captionFont)
-            .foregroundColor(Theme.textSecondary)
-            .padding(.horizontal, 4)
+            .font(Theme.captionFont.weight(.medium))
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 8)
 
-            HStack(spacing: 8) {
-                stepButton("chevron.left", by: -1, label: "Step 1 mm \(axis.labelStart.lowercased())")
-                Slider(value: Binding(
-                    get: { vm.slicePosition },
-                    set: { vm.sliceChanged(to: $0) }
-                ), in: 0...1, onEditingChanged: { vm.sliceEditing($0) })
-                .tint(Theme.accent)
-                .accessibilityLabel("Slice position")
-                stepButton("chevron.right", by: 1, label: "Step 1 mm \(axis.labelEnd.lowercased())")
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    stepButton("chevron.left", by: -1, label: "Step 1 mm \(axis.labelStart.lowercased())")
+                    Slider(value: Binding(
+                        get: { vm.slicePosition },
+                        set: { vm.sliceChanged(to: $0) }
+                    ), in: 0...1, onEditingChanged: { vm.sliceEditing($0) })
+                    .accessibilityLabel("Slice position")
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular, in: .capsule)
+                    stepButton("chevron.right", by: 1, label: "Step 1 mm \(axis.labelEnd.lowercased())")
+                }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 12)
     }
 
     private func stepButton(_ icon: String, by millimetres: Float, label: String) -> some View {
@@ -486,10 +482,11 @@ struct MRIView: View {
         } label: {
             Image(systemName: icon)
                 .font(.body.weight(.semibold))
-                .foregroundColor(Theme.textSecondary)
-                .frame(width: 32, height: 32)
-                .contentShape(Rectangle())
+                .frame(width: 30, height: 30)
         }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .tint(.primary)
         .buttonRepeatBehavior(.enabled)
         .accessibilityLabel(label)
     }

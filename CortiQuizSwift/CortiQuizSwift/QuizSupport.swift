@@ -105,19 +105,25 @@ struct QuizSession {
 
 // MARK: - Shared Quiz Views
 
+/// Running score, shown in the navigation bar.
 struct ScoreLabel: View {
     let score: Int
     let total: Int
 
     var body: some View {
         Label("\(score)/\(total)", systemImage: "star.fill")
-            .foregroundColor(Theme.scoreGold)
-            .font(Theme.headingFont)
+            .font(.subheadline.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(Theme.scoreGold)
+            .contentTransition(.numericText())
+            .animation(.snappy, value: score)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 4)
             .accessibilityLabel("Score \(score) of \(total)")
     }
 }
 
-/// Multiple-choice buttons with correct/incorrect feedback, then "Next →" once answered.
+/// Multiple-choice buttons with correct/incorrect feedback, then "Next" once answered.
 struct AnswerOptionsView: View {
     let options: [String]
     let correctAnswer: String
@@ -128,140 +134,155 @@ struct AnswerOptionsView: View {
     let onNext: () -> Void
 
     var body: some View {
-        ForEach(options, id: \.self) { option in
-            Button {
-                onAnswer(option)
-            } label: {
-                HStack {
-                    Text(option)
-                        .font(Theme.bodyFont)
-                        .multilineTextAlignment(.leading)
-                    Spacer()
-                    if showingFeedback && option == correctAnswer {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(Theme.correct)
+        GlassEffectContainer(spacing: 8) {
+            VStack(spacing: 8) {
+                ForEach(options, id: \.self) { option in
+                    Button {
+                        onAnswer(option)
+                    } label: {
+                        HStack {
+                            Text(option)
+                                .font(Theme.bodyFont.weight(.medium))
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 8)
+                            feedbackIcon(for: option)
+                        }
+                        .foregroundStyle(dimmed(option) ? Theme.textSecondary : Theme.textPrimary)
                     }
-                    if showingFeedback && option == selectedAnswer && option != correctAnswer {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(Theme.incorrect)
-                    }
+                    .buttonStyle(AnswerButtonStyle(tint: tint(for: option)))
+                    .disabled(showingFeedback)
+                    .accessibilityIdentifier("answerOption")
                 }
-                .padding()
-                .background(background(for: option))
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .disabled(showingFeedback)
-            .accessibilityIdentifier("answerOption")
         }
 
         if showingFeedback {
-            Button("Next →", action: onNext)
+            Button(action: onNext) {
+                HStack(spacing: 6) {
+                    Text("Next")
+                    Image(systemName: "arrow.right")
+                }
                 .font(Theme.headingFont)
-                .foregroundColor(.black)
-                .padding(.horizontal, 40)
-                .padding(.vertical, 12)
-                .background(Theme.accent)
-                .clipShape(Capsule())
-                .disabled(nextDisabled)
-                .transition(.scale)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
+            .disabled(nextDisabled)
+            .accessibilityLabel("Next")
+            .transition(.scale(0.9).combined(with: .opacity))
         }
     }
 
-    private func background(for option: String) -> Color {
-        guard showingFeedback else { return Theme.bgCard }
-        if option == correctAnswer { return Theme.correct.opacity(0.3) }
-        if option == selectedAnswer { return Theme.incorrect.opacity(0.3) }
-        return Color.white.opacity(0.05)
+    @ViewBuilder
+    private func feedbackIcon(for option: String) -> some View {
+        if showingFeedback && option == correctAnswer {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Theme.correct)
+                .transition(.scale.combined(with: .opacity))
+        } else if showingFeedback && option == selectedAnswer {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(Theme.incorrect)
+                .transition(.scale.combined(with: .opacity))
+        }
+    }
+
+    /// Answered: options that were neither right nor picked fade back.
+    private func dimmed(_ option: String) -> Bool {
+        showingFeedback && option != correctAnswer && option != selectedAnswer
+    }
+
+    private func tint(for option: String) -> Color? {
+        guard showingFeedback else { return nil }
+        if option == correctAnswer { return Theme.correct.opacity(0.45) }
+        if option == selectedAnswer { return Theme.incorrect.opacity(0.45) }
+        return nil
+    }
+}
+
+/// Full-width answer row in Liquid Glass, tinted once answered.
+private struct AnswerButtonStyle: ButtonStyle {
+    let tint: Color?
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
+            .glassEffect(.regular.tint(tint).interactive(), in: .rect(cornerRadius: 18))
     }
 }
 
 // MARK: - Session Results
 
-/// Shared end-of-session summary for both quiz modes.
+/// Shared end-of-session summary for both quiz modes, shown in a sheet.
 struct QuizResultsView: View {
     let score: Int
     let total: Int
     let bestStreak: Int
     let missed: [String]
     let onPlayAgain: () -> Void
+    let onDone: () -> Void
 
-    private var percent: Int { total == 0 ? 0 : Int(round(Double(score) / Double(total) * 100)) }
+    private var fraction: Double { total == 0 ? 0 : Double(score) / Double(total) }
 
     private var headline: String {
-        switch percent {
+        switch Int((fraction * 100).rounded()) {
         case 90...: return "Outstanding"
-        case 70..<90: return "Well done"
-        case 50..<70: return "Keep going"
-        default: return "Keep practicing"
+        case 70..<90: return "Well Done"
+        case 50..<70: return "Keep Going"
+        default: return "Keep Practicing"
         }
     }
 
     var body: some View {
-        VStack(spacing: 18) {
+        SummarySheet(actionTitle: "Play Again", action: onPlayAgain, onDone: onDone) {
             Text(headline)
                 .font(Theme.titleFont)
-                .foregroundColor(Theme.textPrimary)
 
-            Text("\(score) / \(total)")
-                .font(.system(size: 44, weight: .bold, design: .serif))
-                .foregroundColor(Theme.accent)
+            ScoreRing(fraction: fraction, caption: "correct", lineWidth: 12)
+                .frame(width: 120, height: 120)
 
-            HStack(spacing: 24) {
-                stat("Accuracy", "\(percent)%")
-                stat("Best streak", "\(bestStreak)")
+            HStack(spacing: 12) {
+                statTile("Score", "\(score) of \(total)", icon: "star.fill", color: Theme.scoreGold)
+                statTile("Best Streak", "\(bestStreak)", icon: "flame.fill", color: .orange)
             }
 
             if !missed.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Review these")
-                        .font(Theme.captionFont)
-                        .foregroundColor(Theme.textTertiary)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Review These")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
                     ForEach(missed, id: \.self) { name in
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.uturn.left.circle")
-                                .foregroundColor(Theme.incorrect)
-                                .font(Theme.captionFont)
+                        Label {
                             Text(name)
                                 .font(Theme.bodyFont)
-                                .foregroundColor(Theme.textSecondary)
+                        } icon: {
+                            Image(systemName: "arrow.uturn.backward.circle.fill")
+                                .foregroundStyle(Theme.incorrect)
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                .padding(16)
+                .background(Theme.bgCard, in: .rect(cornerRadius: 20))
             }
-
-            Button(action: onPlayAgain) {
-                Text("Play Again")
-                    .font(Theme.headingFont)
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 12)
-                    .background(Theme.accent)
-                    .clipShape(Capsule())
-            }
-            .accessibilityLabel("Play again")
         }
-        .padding(28)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Theme.bgSecondary)
-                .overlay(RoundedRectangle(cornerRadius: 24).stroke(Theme.bgCardStroke, lineWidth: 1))
-        )
-        .padding(.horizontal, 24)
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
     }
 
-    private func stat(_ label: String, _ value: String) -> some View {
-        VStack(spacing: 2) {
+    private func statTile(_ label: String, _ value: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(label, systemImage: icon)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(color)
             Text(value)
-                .font(Theme.headingFont)
-                .foregroundColor(Theme.textPrimary)
-            Text(label)
-                .font(Theme.captionFont)
-                .foregroundColor(Theme.textTertiary)
+                .font(.system(.title2, design: .rounded).weight(.bold))
+                .monospacedDigit()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Theme.bgCard, in: .rect(cornerRadius: 20))
+        .accessibilityElement(children: .combine)
     }
 }

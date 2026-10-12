@@ -216,16 +216,6 @@ struct MRIQuizView: View {
                 LoadingStateView(message: "Loading MRI quiz…", failed: vm.loadFailed)
             } else {
                 VStack(spacing: 0) {
-                    HStack {
-                        ScoreLabel(score: vm.session.score, total: vm.session.answered)
-                        Spacer()
-                        Text("\(vm.activeAxis.title) · \(vm.activeAxis.locationLabel(vm.sliceCoord))")
-                            .font(Theme.captionFont)
-                            .foregroundColor(Theme.textTertiary)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-
                     ZStack(alignment: .bottomLeading) {
                         SliceFrame(axis: vm.activeAxis) {
                             if let imgDim = vm.sliceImageDim {
@@ -250,29 +240,38 @@ struct MRIQuizView: View {
                         .accessibilityLabel("\(vm.activeAxis.title) MRI slice with one region highlighted. Identify it.")
 
                         MiniBrainView(scene: vm.miniBrainScene)
-                            .frame(width: 120, height: 120)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .frame(width: 112, height: 112)
+                            .clipShape(.rect(cornerRadius: 14))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: 14)
                                     .stroke(Theme.bgCardStroke, lineWidth: 1)
                             )
                             .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
                             .padding(10)
                             .accessibilityHidden(true)
                     }
+                    .overlay(alignment: .topLeading) {
+                        Text("\(vm.activeAxis.title) · \(vm.activeAxis.locationLabel(vm.sliceCoord))")
+                            .font(Theme.captionFont.weight(.medium))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .glassEffect(.regular, in: .capsule)
+                            .padding(10)
+                    }
                     .padding(.horizontal)
 
-                    Spacer().frame(height: 12)
+                    Spacer(minLength: 12)
 
-                    VStack(spacing: 12) {
-                        HStack(spacing: 6) {
+                    VStack(spacing: 14) {
+                        HStack(spacing: 8) {
                             Circle()
                                 .fill(Self.targetDot)
                                 .frame(width: 10, height: 10)
                                 .shadow(color: Self.targetDot.opacity(0.8), radius: 4)
                             Text("Identify the highlighted region")
                                 .font(Theme.headingFont)
-                                .foregroundColor(Theme.textPrimary)
                         }
 
                         AnswerOptionsView(
@@ -285,25 +284,29 @@ struct MRIQuizView: View {
                             onNext: { vm.nextQuestion() }
                         )
                     }
+                    .animation(.snappy, value: vm.showingFeedback)
                     .bottomCard()
                 }
             }
-
-            if vm.sessionComplete {
-                Color.black.opacity(0.7).ignoresSafeArea()
-                QuizResultsView(
-                    score: vm.session.score,
-                    total: vm.session.answered,
-                    bestStreak: vm.session.bestStreak,
-                    missed: vm.session.missed,
-                    onPlayAgain: { vm.startNewSession() }
-                )
-                .transition(.scale.combined(with: .opacity))
+        }
+        .navigationSubtitle(vm.isLoading ? "" : "Question \(vm.session.questionNumber(showingFeedback: vm.showingFeedback)) of \(vm.session.length)")
+        .toolbar {
+            if !vm.isLoading && !vm.loadFailed {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ScoreLabel(score: vm.session.score, total: vm.session.answered)
+                }
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: vm.sessionComplete)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .sessionSummary(isPresented: $vm.sessionComplete) { done in
+            QuizResultsView(
+                score: vm.session.score,
+                total: vm.session.answered,
+                bestStreak: vm.session.bestStreak,
+                missed: vm.session.missed,
+                onPlayAgain: { vm.startNewSession() },
+                onDone: done
+            )
+        }
         .task { await vm.load() }
     }
 

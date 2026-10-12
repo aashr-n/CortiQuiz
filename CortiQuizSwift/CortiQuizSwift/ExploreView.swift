@@ -98,6 +98,7 @@ final class ExploreViewModel {
 
 struct ExploreView: View {
     @State private var vm = ExploreViewModel()
+    @State private var searching = false
 
     var body: some View {
         ZStack {
@@ -106,104 +107,89 @@ struct ExploreView: View {
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading brain atlas…", failed: vm.loadFailed)
             } else {
-                ZStack(alignment: .bottomTrailing) {
-                    SceneKitView(scene: vm.scene, onTap: { hits in
-                        vm.handleTap(hits)
-                    }, recenterTrigger: vm.recenterTrigger)
-                    .ignoresSafeArea(edges: .bottom)
-                    .accessibilityLabel("3D brain atlas. Tap a structure to select it.")
+                SceneKitView(scene: vm.scene, onTap: { hits in
+                    vm.handleTap(hits)
+                }, recenterTrigger: vm.recenterTrigger)
+                .ignoresSafeArea(edges: .bottom)
+                .accessibilityLabel("3D brain atlas. Tap a structure to select it.")
 
-                    RecenterButton { vm.recenterTrigger.toggle() }
-                        .padding(12)
-                }
-
-                VStack {
-                    HStack {
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(Theme.textSecondary)
-                            TextField("Search structures…", text: $vm.searchQuery)
-                                .foregroundColor(.white)
-                                .autocorrectionDisabled()
-                        }
-                        .padding(10)
-                        .background(Theme.bgInput)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                        if vm.selectedStructure != nil {
-                            Button {
-                                vm.clearSelection()
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(Theme.textSecondary)
-                            }
-                            .accessibilityLabel("Clear selection")
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 4)
-
-                    if !vm.searchResults.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(vm.searchResults) { s in
-                                    Button {
-                                        vm.select(s)
-                                        vm.searchQuery = ""
-                                    } label: {
-                                        Text(s.name)
-                                            .font(Theme.bodyFont)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 8)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                    Divider().background(Theme.divider)
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 200)
-                        .background(Theme.bgSecondary.opacity(0.95))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .padding(.horizontal)
-                    }
-
+                VStack(spacing: 12) {
                     Spacer()
-
-                    ExplodeSlider(value: Binding(get: { vm.explodeFactor }, set: { vm.setExplode($0) }))
-                        .padding(.horizontal, 40)
-
+                    SceneControlsBar(
+                        explodeFactor: Binding(get: { vm.explodeFactor }, set: { vm.setExplode($0) }),
+                        onRecenter: { vm.recenterTrigger.toggle() }
+                    )
                     if let s = vm.selectedStructure {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(s.name)
-                                .font(Theme.headingFont)
-                                .foregroundColor(Theme.textPrimary)
-                            if !s.hierarchyPath.isEmpty {
-                                Text(s.hierarchyPath.joined(separator: " → ") + " → " + s.name)
-                                    .font(Theme.captionFont)
-                                    .foregroundColor(Theme.textSecondary)
-                                    .lineLimit(2)
-                            }
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Theme.bgCard)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Theme.bgCardStroke, lineWidth: 1)
-                                )
-                        )
-                        .padding(.horizontal)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        SelectionCard(structure: s) { vm.clearSelection() }
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
+                .padding(.horizontal, 12)
                 .padding(.bottom, 8)
+                .animation(.snappy, value: vm.selectedStructure?.id)
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .searchable(text: $vm.searchQuery, isPresented: $searching,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search structures")
+        .searchSuggestions {
+            ForEach(vm.searchResults) { s in
+                Button {
+                    vm.select(s)
+                    vm.searchQuery = ""
+                    searching = false
+                } label: {
+                    Label {
+                        Text(s.name)
+                            .foregroundStyle(Theme.textPrimary)
+                    } icon: {
+                        Image(systemName: "circle.fill")
+                            .foregroundStyle(s.color)
+                    }
+                }
+            }
+        }
+        .autocorrectionDisabled()
         .task { await vm.load() }
+    }
+}
+
+/// The selected structure's name and place in the atlas hierarchy, floating over the brain.
+private struct SelectionCard: View {
+    let structure: BrainStructure
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Matches the structure's highlight in the scene.
+            Circle()
+                .fill(Color(SceneColors.selection))
+                .frame(width: 12, height: 12)
+                .padding(.top, 5)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(structure.name)
+                    .font(Theme.headingFont)
+                if !structure.hierarchyPath.isEmpty {
+                    Text(structure.hierarchyPath.joined(separator: " › "))
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onClear) {
+                Label("Clear selection", systemImage: "xmark")
+                    .labelStyle(.iconOnly)
+                    .font(.footnote.weight(.bold))
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .tint(.secondary)
+        }
+        .padding(16)
+        .glassEffect(.regular, in: .rect(corners: .concentric(minimum: 24), isUniform: false))
     }
 }

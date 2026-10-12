@@ -177,7 +177,11 @@ struct LearnView: View {
                 LoadingStateView(message: "Loading study deck…", failed: vm.loadFailed)
             } else {
                 VStack(spacing: 0) {
-                    progressHeader
+                    ProgressView(value: Double(vm.learnedCount), total: Double(max(vm.totalCount, 1)))
+                        .tint(Theme.accent)
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+                        .accessibilityLabel("Learned \(vm.learnedCount) of \(vm.totalCount)")
 
                     ZStack(alignment: .bottom) {
                         SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
@@ -192,41 +196,16 @@ struct LearnView: View {
                     }
 
                     studyCard
+                        .animation(.snappy, value: vm.revealed)
                         .bottomCard()
                 }
             }
-
-            if vm.sessionComplete {
-                Color.black.opacity(0.7).ignoresSafeArea()
-                completionCard
-                    .transition(.scale.combined(with: .opacity))
-            }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: vm.sessionComplete)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .navigationSubtitle(vm.isLoading ? "" : "\(vm.learnedCount) of \(vm.totalCount) learned · no score")
+        .sessionSummary(isPresented: $vm.sessionComplete) { done in
+            completionSummary(onDone: done)
+        }
         .task { await vm.load() }
-    }
-
-    // MARK: Header
-
-    private var progressHeader: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Label("\(vm.learnedCount)/\(vm.totalCount)", systemImage: "checkmark.seal.fill")
-                    .foregroundColor(Theme.accent)
-                    .font(Theme.headingFont)
-                    .accessibilityLabel("Learned \(vm.learnedCount) of \(vm.totalCount)")
-                Spacer()
-                Text("No score · learn at your pace")
-                    .font(Theme.captionFont)
-                    .foregroundColor(Theme.textTertiary)
-            }
-            ProgressView(value: Double(vm.learnedCount), total: Double(max(vm.totalCount, 1)))
-                .tint(Theme.accent)
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
     }
 
     // MARK: Study card (front = recall prompt, back = answer + self-rating)
@@ -234,77 +213,69 @@ struct LearnView: View {
     @ViewBuilder
     private var studyCard: some View {
         if vm.revealed, let card = vm.currentCard {
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 VStack(spacing: 4) {
                     Text(card.baseName)
                         .font(Theme.titleFont)
-                        .foregroundColor(Theme.textPrimary)
                         .multilineTextAlignment(.center)
                     if card.hasPair {
-                        Text("appears on both hemispheres")
+                        Text("Appears in both hemispheres")
                             .font(Theme.captionFont)
-                            .foregroundColor(Theme.textTertiary)
+                            .foregroundStyle(Theme.textTertiary)
                     }
                     if !card.hierarchyPath.isEmpty {
-                        Text(card.hierarchyPath.joined(separator: " → "))
+                        Text(card.hierarchyPath.joined(separator: " › "))
                             .font(Theme.captionFont)
-                            .foregroundColor(Theme.textSecondary)
+                            .foregroundStyle(Theme.textSecondary)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                     }
                 }
 
-                HStack(spacing: 12) {
-                    Button { vm.markReview() } label: {
-                        Label("Study again", systemImage: "arrow.uturn.left")
-                            .font(Theme.headingFont)
-                            .foregroundColor(Theme.textPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.08))
-                            .clipShape(Capsule())
+                GlassEffectContainer(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Button { vm.markReview() } label: {
+                            Label("Study again", systemImage: "arrow.uturn.backward")
+                                .font(Theme.headingFont)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+
+                        Button { vm.markKnown() } label: {
+                            Label("Got it", systemImage: "checkmark")
+                                .font(Theme.headingFont)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(Theme.correct.mix(with: .black, by: 0.25))
                     }
-                    Button { vm.markKnown() } label: {
-                        Label("Got it", systemImage: "checkmark")
-                            .font(Theme.headingFont)
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Theme.correct)
-                            .clipShape(Capsule())
-                    }
+                    .controlSize(.large)
                 }
             }
         } else {
             VStack(spacing: 14) {
                 Text("What structure is highlighted?")
                     .font(Theme.headingFont)
-                    .foregroundColor(Theme.textPrimary)
                     .multilineTextAlignment(.center)
 
                 if vm.hintShown, let region = vm.currentCard?.region, !region.isEmpty {
-                    Text("Region · \(region)")
-                        .font(Theme.captionFont)
-                        .foregroundColor(Theme.textSecondary)
+                    Label(region, systemImage: "lightbulb.fill")
+                        .font(Theme.bodyFont)
+                        .foregroundStyle(Theme.textSecondary)
                         .transition(.opacity)
                 }
 
                 Button { vm.reveal() } label: {
                     Text("Reveal")
                         .font(Theme.headingFont)
-                        .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Theme.accent)
-                        .clipShape(Capsule())
                 }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
 
                 if let region = vm.currentCard?.region, !region.isEmpty, !vm.hintShown {
-                    Button { vm.showHint() } label: {
-                        Text("Need a hint?")
-                            .font(Theme.captionFont)
-                            .foregroundColor(Theme.accent)
-                    }
+                    Button("Need a hint?") { vm.showHint() }
+                        .font(Theme.bodyFont)
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: vm.hintShown)
@@ -313,46 +284,34 @@ struct LearnView: View {
 
     // MARK: Completion
 
-    private var completionCard: some View {
-        VStack(spacing: 18) {
+    private func completionSummary(onDone: @escaping () -> Void) -> some View {
+        SummarySheet(actionTitle: "Study Again", action: { vm.startSession() }, onDone: onDone) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 44))
-                .foregroundColor(Theme.accent)
+                .font(.system(size: 56))
+                .foregroundStyle(Theme.accent.gradient)
+                .symbolEffect(.bounce, options: .nonRepeating)
 
-            Text("Deck complete")
+            Text("Deck Complete")
                 .font(Theme.titleFont)
-                .foregroundColor(Theme.textPrimary)
 
             Text("You studied \(vm.totalCount) structure\(vm.totalCount == 1 ? "" : "s").")
                 .font(Theme.bodyFont)
-                .foregroundColor(Theme.textSecondary)
+                .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
 
             if !vm.struggled.isEmpty {
-                Text("\(vm.struggled.count) needed another look — they'll come up first next time you quiz.")
-                    .font(Theme.captionFont)
-                    .foregroundColor(Theme.textTertiary)
-                    .multilineTextAlignment(.center)
+                Label {
+                    Text("\(vm.struggled.count) needed another look — they'll come up first next time you quiz.")
+                } icon: {
+                    Image(systemName: "arrow.uturn.backward.circle.fill")
+                        .foregroundStyle(Theme.accent)
+                }
+                .font(Theme.bodyFont)
+                .foregroundStyle(Theme.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(Theme.bgCard, in: .rect(cornerRadius: 20))
             }
-
-            Button { vm.startSession() } label: {
-                Text("Study Again")
-                    .font(Theme.headingFont)
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 12)
-                    .background(Theme.accent)
-                    .clipShape(Capsule())
-            }
-            .accessibilityLabel("Study again")
         }
-        .padding(28)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Theme.bgSecondary)
-                .overlay(RoundedRectangle(cornerRadius: 24).stroke(Theme.bgCardStroke, lineWidth: 1))
-        )
-        .padding(.horizontal, 24)
-        .shadow(color: .black.opacity(0.5), radius: 20, y: 8)
     }
 }

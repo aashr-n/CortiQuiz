@@ -3,37 +3,52 @@ import SwiftUI
 // MARK: - Modes
 
 enum AppMode: String, CaseIterable, Identifiable, Hashable {
-    case learn, quiz, explore, mri, mriQuiz
+    case learn, quiz, mriQuiz, explore, mri
 
     var id: Self { self }
 
+    /// Menu sections: test yourself, or look around.
+    static let practice: [AppMode] = [.learn, .quiz, .mriQuiz]
+    static let reference: [AppMode] = [.explore, .mri]
+
     var icon: String {
         switch self {
-        case .learn: return "graduationcap.fill"
-        case .quiz: return "brain.head.profile"
-        case .explore: return "cube.transparent"
-        case .mri: return "waveform.path.ecg"
-        case .mriQuiz: return "brain.filled.head.profile"
+        case .learn: return "rectangle.portrait.on.rectangle.portrait.angled.fill"
+        case .quiz: return "brain.head.profile.fill"
+        case .mriQuiz: return "square.3.layers.3d.middle.filled"
+        case .explore: return "cube.transparent.fill"
+        case .mri: return "slider.horizontal.below.square.filled.and.square"
+        }
+    }
+
+    /// Icon tile color on the menu.
+    var color: Color {
+        switch self {
+        case .learn: return .orange
+        case .quiz: return Theme.accent
+        case .mriQuiz: return .purple
+        case .explore: return .teal
+        case .mri: return .indigo
         }
     }
 
     var title: String {
         switch self {
-        case .learn: return "Learn Mode"
-        case .quiz: return "Normal Mode"
-        case .explore: return "Explore Mode"
-        case .mri: return "MRI Mode"
+        case .learn: return "Learn"
+        case .quiz: return "3D Quiz"
         case .mriQuiz: return "MRI Quiz"
+        case .explore: return "3D Atlas"
+        case .mri: return "MRI Slicer"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .learn: return "Flashcards — study with no pressure"
-        case .quiz: return "Identify brain structures"
-        case .explore: return "Browse the full brain atlas"
-        case .mri: return "Dynamic brain cross-sections"
-        case .mriQuiz: return "Identify structures from slices"
+        case .learn: return "Flashcards at your own pace"
+        case .quiz: return "Name the highlighted structure"
+        case .mriQuiz: return "Name structures on brain slices"
+        case .explore: return "Browse every structure in 3D"
+        case .mri: return "Scroll through cross-sections"
         }
     }
 
@@ -42,9 +57,9 @@ enum AppMode: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .learn: LearnView()
         case .quiz: QuizView()
+        case .mriQuiz: MRIQuizView()
         case .explore: ExploreView()
         case .mri: MRIView()
-        case .mriQuiz: MRIQuizView()
         }
     }
 }
@@ -52,130 +67,151 @@ enum AppMode: String, CaseIterable, Identifiable, Hashable {
 // MARK: - Main Menu
 
 struct MainMenuView: View {
-    @State private var appear = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let store = ProgressStore.shared
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(colors: [Theme.bgPrimary, Theme.bgSecondary],
-                               startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-
-                VStack(spacing: 32) {
-                    Spacer()
-
-                    VStack(spacing: 8) {
-                        Text("CortiQuiz")
-                            .font(Theme.displayFont)
-                            .foregroundStyle(Theme.textPrimary)
-                        Text("Brain Anatomy Trainer")
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    .opacity(appear ? 1 : 0)
-                    .offset(y: slideOffset(-20))
-                    .animation(entrance(), value: appear)
-
-                    Spacer()
-
-                    VStack(spacing: 16) {
-                        ForEach(Array(AppMode.allCases.enumerated()), id: \.element) { index, mode in
-                            NavigationLink(value: mode) {
-                                ModeCard(icon: mode.icon, title: mode.title, subtitle: mode.subtitle)
-                            }
-                            .buttonStyle(PressableStyle())
-                            .opacity(appear ? 1 : 0)
-                            .offset(y: slideOffset(30))
-                            .animation(entrance(delay: Double(index) * 0.08), value: appear)
-                        }
-                    }
-                    .padding(.horizontal)
-
-                    Spacer()
-
+            List {
+                Section {
                     if store.totalAnswered > 0 {
-                        HStack(spacing: 28) {
-                            statItem("Answered", "\(store.totalAnswered)")
-                            statItem("Accuracy", "\(Int(store.accuracy * 100))%")
-                            statItem("Best streak", "\(store.bestStreak)")
-                        }
-                        .padding(.bottom, 12)
-                        .opacity(appear ? 1 : 0)
-                        .animation(entrance(delay: 0.4), value: appear)
+                        ProgressSummary(store: store)
+                    } else {
+                        WelcomeRow()
                     }
                 }
+
+                Section("Practice") {
+                    ForEach(AppMode.practice) { ModeRow(mode: $0) }
+                }
+
+                Section {
+                    ForEach(AppMode.reference) { ModeRow(mode: $0) }
+                } header: {
+                    Text("Explore")
+                } footer: {
+                    Text("Anatomy from the SPL-PNL Brain Atlas, Surgical Planning Lab and Psychiatry Neuroimaging Lab, Brigham and Women's Hospital.")
+                }
             }
-            .navigationDestination(for: AppMode.self) { $0.destination }
-            .onAppear { appear = true }
-            .onDisappear { appear = false }
+            .scrollContentBackground(.hidden)
+            .background { MenuBackground() }
+            .navigationTitle("CortiQuiz")
+            .navigationSubtitle("Brain Anatomy Trainer")
+            .navigationDestination(for: AppMode.self) { mode in
+                mode.destination
+                    .navigationTitle(mode.title)
+                    .navigationBarTitleDisplayMode(.inline)
+            }
         }
-        .tint(.white)
+        .tint(Theme.accent)
     }
+}
 
-    /// Slide-in distance before the entrance animation; none with Reduce Motion.
-    private func slideOffset(_ distance: CGFloat) -> CGFloat {
-        appear || reduceMotion ? 0 : distance
+/// Grouped background with a faint wash of the accent behind the title.
+private struct MenuBackground: View {
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(uiColor: .systemGroupedBackground)
+            LinearGradient(
+                colors: [Theme.accent.opacity(0.28), Theme.accent.opacity(0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 420)
+        }
+        .ignoresSafeArea()
     }
+}
 
-    /// Staggered spring normally; a plain short fade with Reduce Motion.
-    private func entrance(delay: Double = 0) -> Animation {
-        reduceMotion
-            ? .easeOut(duration: 0.2)
-            : .spring(response: 0.6, dampingFraction: 0.8).delay(delay)
-    }
+// MARK: - Rows
 
-    private func statItem(_ label: String, _ value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(Theme.headingFont)
-                .foregroundStyle(Theme.textPrimary)
-            Text(label)
-                .font(Theme.captionFont)
-                .foregroundStyle(Theme.textTertiary)
+private struct ModeRow: View {
+    let mode: AppMode
+
+    var body: some View {
+        NavigationLink(value: mode) {
+            HStack(spacing: 14) {
+                ModeIcon(mode: mode)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mode.title)
+                        .font(.body.weight(.semibold))
+                    Text(mode.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+            }
+            .padding(.vertical, 6)
         }
     }
 }
 
-// MARK: - Mode Card
-
-private struct ModeCard: View {
-    let icon: String
-    let title: String
-    let subtitle: String
+/// Settings-style rounded tile with the mode's symbol.
+private struct ModeIcon: View {
+    let mode: AppMode
 
     var body: some View {
+        Image(systemName: mode.icon)
+            .font(.system(size: 19, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 42, height: 42)
+            .background(mode.color.gradient, in: .rect(cornerRadius: 11, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+private struct WelcomeRow: View {
+    var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.title)
-                .foregroundStyle(Theme.accent)
-                .frame(width: 50, height: 50)
-                .background(Theme.bgCard)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
+            Image(systemName: "brain.fill")
+                .font(.system(size: 36))
+                .foregroundStyle(Theme.accent.gradient)
+                .symbolEffect(.breathe)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(Theme.headingFont)
-                    .foregroundStyle(Theme.textPrimary)
-                Text(subtitle)
-                    .font(Theme.captionFont)
-                    .foregroundStyle(Theme.textSecondary)
+                Text("Welcome")
+                    .font(.headline)
+                Text("Start with Learn to study each structure, then test yourself in a quiz. Your progress will show up here.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .foregroundStyle(Theme.textTertiary)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Theme.bgCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Theme.bgCardStroke, lineWidth: 1)
-                )
-        )
+        .padding(.vertical, 8)
+    }
+}
+
+/// Lifetime accuracy ring plus totals.
+private struct ProgressSummary: View {
+    let store: ProgressStore
+
+    var body: some View {
+        HStack(spacing: 20) {
+            ScoreRing(fraction: store.accuracy, caption: "accuracy")
+                .frame(width: 88, height: 88)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Your Progress")
+                    .font(.headline)
+                stat("\(store.totalAnswered) answered", icon: "checkmark.circle.fill", color: Theme.correct)
+                stat("Best streak \(store.bestStreak)", icon: "flame.fill", color: .orange)
+                if !store.reviewQueue.isEmpty {
+                    stat("\(store.reviewQueue.count) to review", icon: "arrow.uturn.backward.circle.fill", color: Theme.accent)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func stat(_ text: String, icon: String, color: Color) -> some View {
+        Label {
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+        }
     }
 }

@@ -139,8 +139,6 @@ struct QuizView: View {
                 LoadingStateView(message: "Loading quiz…", failed: vm.loadFailed)
             } else {
                 VStack(spacing: 0) {
-                    header
-
                     ZStack(alignment: .bottom) {
                         SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
                             .frame(maxHeight: .infinity)
@@ -153,10 +151,17 @@ struct QuizView: View {
                         .padding(12)
                     }
 
-                    VStack(spacing: 12) {
-                        Text("What structure is highlighted?")
-                            .font(Theme.headingFont)
-                            .foregroundColor(Theme.textPrimary)
+                    VStack(spacing: 14) {
+                        VStack(spacing: 2) {
+                            Text("What structure is highlighted?")
+                                .font(Theme.headingFont)
+                            // After answering, the exact structure (with its hemisphere).
+                            if let target = vm.currentTarget, vm.showingFeedback {
+                                Text(target.name)
+                                    .font(Theme.bodyFont)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        }
 
                         AnswerOptionsView(
                             options: vm.options,
@@ -167,42 +172,29 @@ struct QuizView: View {
                             onNext: { vm.nextQuestion() }
                         )
                     }
+                    .animation(.snappy, value: vm.showingFeedback)
                     .bottomCard()
                 }
             }
-
-            if vm.sessionComplete {
-                Color.black.opacity(0.7).ignoresSafeArea()
-                QuizResultsView(
-                    score: vm.session.score,
-                    total: vm.session.answered,
-                    bestStreak: vm.session.bestStreak,
-                    missed: vm.session.missed,
-                    onPlayAgain: { vm.startNewSession() }
-                )
-                .transition(.scale.combined(with: .opacity))
+        }
+        .navigationSubtitle(vm.isLoading ? "" : "Question \(vm.session.questionNumber(showingFeedback: vm.showingFeedback)) of \(vm.session.length)")
+        .toolbar {
+            if !vm.isLoading && !vm.loadFailed {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ScoreLabel(score: vm.session.score, total: vm.session.answered)
+                }
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: vm.sessionComplete)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .sessionSummary(isPresented: $vm.sessionComplete) { done in
+            QuizResultsView(
+                score: vm.session.score,
+                total: vm.session.answered,
+                bestStreak: vm.session.bestStreak,
+                missed: vm.session.missed,
+                onPlayAgain: { vm.startNewSession() },
+                onDone: done
+            )
+        }
         .task { await vm.load() }
-    }
-
-    private var header: some View {
-        HStack {
-            ScoreLabel(score: vm.session.score, total: vm.session.answered)
-            Spacer()
-            Text("Question \(vm.session.questionNumber(showingFeedback: vm.showingFeedback)) of \(vm.session.length)")
-                .font(Theme.captionFont)
-                .foregroundColor(Theme.textTertiary)
-            if let target = vm.currentTarget, vm.showingFeedback {
-                Text(target.name)
-                    .font(Theme.bodyFont)
-                    .foregroundColor(Theme.textSecondary)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
     }
 }

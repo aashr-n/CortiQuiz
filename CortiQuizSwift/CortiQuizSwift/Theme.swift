@@ -3,34 +3,42 @@ import SwiftUI
 // MARK: - Design Tokens
 
 enum Theme {
-    // MARK: Backgrounds
-    static let bgPrimary = Color(red: 0.035, green: 0.035, blue: 0.035)
-    static let bgSecondary = Color(red: 0.07, green: 0.07, blue: 0.07)
-    static let bgCard = Color.white.opacity(0.06)
+    // MARK: Backgrounds — system grouped colors, so cards match native lists and sheets.
+    static let bgCard = Color(uiColor: .secondarySystemGroupedBackground)
     static let bgCardStroke = Color.white.opacity(0.09)
-    static let bgInput = Color.white.opacity(0.10)
 
-    // MARK: Accent — dusty brain-pink
+    // MARK: Accent — dusty brain-pink (also the asset catalog's AccentColor)
     static let accent = Color(red: 0.83, green: 0.51, blue: 0.60)       // #D4829A
 
-    // MARK: Monochrome
-    static let textPrimary = Color.white
-    static let textSecondary = Color(white: 0.50)
-    static let textTertiary = Color(white: 0.35)
-    static let divider = Color.white.opacity(0.08)
+    // MARK: Text — system label colors
+    static let textPrimary = Color.primary
+    static let textSecondary = Color.secondary
+    static let textTertiary = Color(uiColor: .tertiaryLabel)
 
     // MARK: Feedback
     static let correct = Color(red: 0.30, green: 0.85, blue: 0.45)
     static let incorrect = Color(red: 0.90, green: 0.30, blue: 0.30)
     static let scoreGold = Color(red: 0.95, green: 0.77, blue: 0.20)
 
-    // MARK: Typography — New York serif for headings, SF Pro for body.
-    // Built on text styles so they scale with Dynamic Type / accessibility text sizes.
-    static let displayFont: Font = .system(.largeTitle, design: .serif).weight(.bold)
+    // MARK: Typography — New York serif for brand moments (titles, the answer on a
+    // flashcard), SF Pro everywhere else. Built on text styles so they scale with
+    // Dynamic Type / accessibility text sizes.
     static let titleFont: Font = .system(.title2, design: .serif).weight(.semibold)
-    static let headingFont: Font = .system(.headline, design: .serif)
-    static let bodyFont: Font = .system(.subheadline)
-    static let captionFont: Font = .system(.caption)
+    static let headingFont: Font = .headline
+    static let bodyFont: Font = .subheadline
+    static let captionFont: Font = .caption
+
+    /// Navigation bar titles in New York, matching `titleFont`. Applied once at launch.
+    static func applyNavigationBarFonts() {
+        func serif(_ style: UIFont.TextStyle, _ weight: UIFont.Weight) -> UIFont {
+            let system = UIFont.systemFont(ofSize: UIFont.preferredFont(forTextStyle: style).pointSize, weight: weight)
+            guard let descriptor = system.fontDescriptor.withDesign(.serif) else { return system }
+            return UIFont(descriptor: descriptor, size: 0)
+        }
+        let bar = UINavigationBar.appearance()
+        bar.largeTitleTextAttributes = [.font: serif(.largeTitle, .bold)]
+        bar.titleTextAttributes = [.font: serif(.headline, .semibold)]
+    }
 
     // MARK: Haptics
     static func tapHaptic() {
@@ -88,17 +96,6 @@ nonisolated enum SceneColors {
         sliceBackground.getWhite(&bg, alpha: nil)
         func fade(_ c: CGFloat) -> CGFloat { bg + (c - bg) * brightness }
         return UIColor(red: fade(r), green: fade(g), blue: fade(b), alpha: 1)
-    }
-}
-
-// MARK: - Pressable Button Style
-
-struct PressableStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .opacity(configuration.isPressed ? 0.80 : 1.0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

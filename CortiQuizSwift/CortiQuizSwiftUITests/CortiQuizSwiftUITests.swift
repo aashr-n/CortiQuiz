@@ -40,35 +40,55 @@ final class CortiQuizSwiftUITests: XCTestCase {
     func testMainMenuListsEveryMode() throws {
         let app = XCUIApplication()
         app.launch()
-        for mode in ["Learn Mode", "Normal Mode", "Explore Mode", "MRI Mode", "MRI Quiz"] {
+        for mode in ["Learn", "3D Quiz", "MRI Quiz", "3D Atlas", "MRI Slicer"] {
             XCTAssertTrue(app.staticTexts[mode].waitForExistence(timeout: 10), "\(mode) missing")
         }
         attachScreenshot(app, "Main menu")
     }
 
     @MainActor
-    func testNormalModeAnswersAQuestion() throws {
-        let app = open("Normal Mode")
+    func testQuizAnswersAQuestion() throws {
+        let app = open("3D Quiz")
         XCTAssertTrue(app.staticTexts["What structure is highlighted?"].waitForExistence(timeout: loadTimeout))
         XCTAssertTrue(app.staticTexts["Question 1 of 10"].exists)
-        attachScreenshot(app, "Normal mode question")
+        attachScreenshot(app, "3D quiz question")
 
         let options = app.buttons.matching(identifier: "answerOption")
         XCTAssertEqual(options.count, 4)
         options.firstMatch.tap()
-        let next = app.buttons["Next →"]
+        let next = app.buttons["Next"]
         XCTAssertTrue(next.waitForExistence(timeout: 5))
-        attachScreenshot(app, "Normal mode feedback")
+        attachScreenshot(app, "3D quiz feedback")
 
         next.tap()
         XCTAssertTrue(app.staticTexts["Question 2 of 10"].waitForExistence(timeout: 5))
     }
 
     @MainActor
+    func testQuizSessionEndsWithSummary() throws {
+        let app = open("3D Quiz")
+        XCTAssertTrue(app.staticTexts["What structure is highlighted?"].waitForExistence(timeout: loadTimeout))
+
+        let next = app.buttons["Next"]
+        for _ in 0..<10 {
+            app.buttons.matching(identifier: "answerOption").firstMatch.tap()
+            XCTAssertTrue(next.waitForExistence(timeout: 5))
+            next.tap()
+        }
+        let playAgain = app.buttons["Play Again"]
+        XCTAssertTrue(playAgain.waitForExistence(timeout: 5))
+        attachScreenshot(app, "3D quiz summary")
+
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["MRI Slicer"].waitForExistence(timeout: 5), "Done should return to the menu")
+    }
+
+    @MainActor
     func testLearnModeRevealsACard() throws {
-        let app = open("Learn Mode")
+        let app = open("Learn")
         let reveal = app.buttons["Reveal"]
         XCTAssertTrue(reveal.waitForExistence(timeout: loadTimeout))
+        attachScreenshot(app, "Learn mode card")
         reveal.tap()
         XCTAssertTrue(app.buttons["Got it"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Study again"].exists)
@@ -76,40 +96,42 @@ final class CortiQuizSwiftUITests: XCTestCase {
     }
 
     @MainActor
-    func testExploreSearchSelectsAStructure() throws {
-        let app = open("Explore Mode")
-        let search = app.textFields["Search structures…"]
+    func testAtlasSearchSelectsAStructure() throws {
+        let app = open("3D Atlas")
+        let search = app.searchFields["Search structures"]
         XCTAssertTrue(search.waitForExistence(timeout: loadTimeout))
         search.tap()
         search.typeText("putamen")
         let result = app.buttons["left putamen"]
         XCTAssertTrue(result.waitForExistence(timeout: 5))
+        attachScreenshot(app, "Atlas search suggestions")
         result.tap()
         XCTAssertTrue(app.buttons["Clear selection"].waitForExistence(timeout: 5))
-        attachScreenshot(app, "Explore selection")
+        attachScreenshot(app, "Atlas selection")
     }
 
     @MainActor
-    func testMRIModeSlicesAlongEachAxis() throws {
-        let app = open("MRI Mode")
+    func testMRISlicerSlicesAlongEachAxis() throws {
+        let app = open("MRI Slicer")
         let slider = app.sliders["Slice position"]
         XCTAssertTrue(slider.waitForExistence(timeout: loadTimeout))
         attachScreenshot(app, "MRI axial 50%")
 
         slider.adjust(toNormalizedSliderPosition: 0.3)
-        XCTAssertTrue(app.staticTexts["Axial MRI Slice"].exists)
+        XCTAssertTrue(app.buttons["Axial"].isSelected)
         attachScreenshot(app, "MRI axial 30%")
 
         for axis in ["Coronal", "Sagittal"] {
-            app.buttons[axis].tap()
-            XCTAssertTrue(app.staticTexts["\(axis) MRI Slice"].waitForExistence(timeout: 5))
+            let segment = app.buttons[axis]
+            segment.tap()
+            XCTAssertTrue(segment.isSelected)
             attachScreenshot(app, "MRI \(axis.lowercased())")
         }
     }
 
     @MainActor
-    func testMRIModeNamesATappedRegion() throws {
-        let app = open("MRI Mode")
+    func testMRISlicerNamesATappedRegion() throws {
+        let app = open("MRI Slicer")
         let slice = app.descendants(matching: .any)["mriSlice"]
         XCTAssertTrue(slice.waitForExistence(timeout: loadTimeout))
 
@@ -133,12 +155,12 @@ final class CortiQuizSwiftUITests: XCTestCase {
         let options = app.buttons.matching(identifier: "answerOption")
         XCTAssertEqual(options.count, 4)
         options.firstMatch.tap()
-        let next = app.buttons["Next →"]
+        let next = app.buttons["Next"]
         XCTAssertTrue(next.waitForExistence(timeout: 5))
         attachScreenshot(app, "MRI quiz feedback")
 
         next.tap()
-        XCTAssertTrue(app.buttons["Next →"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Next"].waitForNonExistence(timeout: 10))
         attachScreenshot(app, "MRI quiz second question")
     }
 }

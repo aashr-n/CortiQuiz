@@ -16,15 +16,15 @@
 | `AtlasLoader.swift` | Parses `atlasStructure.json` once (lazy static), builds hierarchy; `ModelCache` loads + deep-clones OBJ nodes on a serial queue |
 | `BrainSceneLoader.swift` | Shared "brain-only structures → cloned nodes → bounds/centers" scene build used by every mode; honors task cancellation |
 | `SceneUtilities.swift` | `Background.run` (`@concurrent` off-main work), `restyleNodes`, `ExplodeLayout`, MRI cut-shader `SCNNode` helpers (`CutFaces`) |
-| `Theme.swift` | Design tokens (SwiftUI) + `SceneColors` (SceneKit material colors, nonisolated), haptics, `PressableStyle`, `Color.fromRGB` |
-| `SharedViews.swift` | `LoadingStateView`, `ExplodeSlider`, `RecenterButton`, `SceneControlsBar`, `.bottomCard()` |
+| `Theme.swift` | Design tokens (system semantic colors, accent, fonts; serif nav-bar titles via `applyNavigationBarFonts`) + `SceneColors` (SceneKit material colors, nonisolated), haptics, `Color.fromRGB` |
+| `SharedViews.swift` | `LoadingStateView`, Liquid Glass scene controls (`ExplodeSlider`, `RecenterButton`, `SceneControlsBar`), `.bottomCard()`, `ScoreRing`, end-of-session `SummarySheet` + `.sessionSummary` (sheet whose Done pops back to the menu) |
 | `QuizSupport.swift` | `QuizOptionBuilder` (distractors), `QuizTargetPicker` (flagged → weak → unasked, by baseName), `QuizSession`, `AnswerOptionsView`, `ScoreLabel`, `QuizResultsView` |
 | `ProgressStore.swift` | Persistent stats, best session streak, Learn-mode review queue (UserDefaults JSON; injectable defaults for tests) |
 | `MRISlicing.swift` | `MRIAxis` (edge labels, slice-location text), slice camera/cut/plane geometry + shared constants, `SliceRenderer` (filled-cut snapshots + tap picking on a private queue) |
 | `SliceClassifier.swift` | Reads triangles from loaded SceneKit geometry, scores slice visibility for MRI Quiz, caches results per session |
 | `MiniBrainBuilder.swift` | Gray translucent mini-brain scene + two-layer slice plane for the MRI modes; `highlight` draws a structure on top |
 | `SceneKitView.swift` | `UIViewRepresentable` wrapping `SCNView` — camera/lights via `ensureSceneSetup`, tap → all hits |
-| `MainMenuView.swift` | `AppMode` enum + menu; destinations built lazily via `navigationDestination` |
+| `MainMenuView.swift` | `AppMode` enum (titles, icons, tile colors, Practice/Explore sections) + inset-grouped menu with progress summary; destinations built lazily via `navigationDestination`, which also sets each mode's nav title |
 | `LearnView.swift` / `QuizView.swift` / `ExploreView.swift` / `MRIView.swift` / `MRIQuizView.swift` | The five modes. Each view model loads in `load() async`, started by `.task` (cancelled on disappear) |
 | `CortiQuizSwiftApp.swift` | Entry point → `MainMenuView` |
 | `../tools/convert_vtk_to_obj.py` | Regenerates `BrainModels/*.obj` from `brainAtlas2017-01/models/*.vtk` (byte-identical to the shipped files) |
