@@ -445,3 +445,38 @@ struct SliceRendererTests {
         }
     }
 }
+
+struct CameraGlideTests {
+
+    private func camera(at position: SIMD3<Float>, lookingAt target: SIMD3<Float>, fieldOfView: CGFloat) -> SCNNode {
+        let node = SCNNode()
+        node.camera = SCNCamera()
+        node.camera?.fieldOfView = fieldOfView
+        node.simdPosition = position
+        node.simdLook(at: target, up: SIMD3(0, 0, 1), localFront: SIMD3(0, 0, -1))
+        return node
+    }
+
+    @Test func glideRunsFromOneShotToTheOther() throws {
+        // About half a turn apart, orbiting different points from different distances.
+        let start = camera(at: SIMD3(-300, 0, 0), lookingAt: .zero, fieldOfView: 15)
+        let end = camera(at: SIMD3(310, 40, 120), lookingAt: SIMD3(10, 20, 30), fieldOfView: 30)
+        let glide = CameraGlide(
+            from: try #require(CameraGlide.Shot(start, orbiting: .zero)),
+            to: try #require(CameraGlide.Shot(end, orbiting: SIMD3(10, 20, 30)))
+        )
+
+        #expect(simd_distance(glide.shot(at: 0).position, start.simdPosition) < 0.01)
+        #expect(simd_distance(glide.shot(at: 1).position, end.simdPosition) < 0.01)
+        #expect(abs(simd_dot(glide.shot(at: 1).orientation.vector, end.simdOrientation.vector)) > 0.9999)
+        #expect(glide.shot(at: 0.5).fieldOfView == 22.5)
+    }
+
+    @Test func shotOrbitsAPointStraightAheadAtTheTargetsDistance() throws {
+        let node = camera(at: SIMD3(0, -100, 0), lookingAt: .zero, fieldOfView: 30)
+        // Off to the side, but 200 away: the pivot is 200 straight ahead instead.
+        let shot = try #require(CameraGlide.Shot(node, orbiting: SIMD3(0, 60, 120)))
+        #expect(simd_distance(shot.pivot, SIMD3(0, 100, 0)) < 0.01)
+        #expect(CameraGlide.Shot(SCNNode(), orbiting: .zero) == nil)
+    }
+}

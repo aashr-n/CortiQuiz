@@ -25,6 +25,12 @@ struct SceneKitView: UIViewRepresentable {
             view.addGestureRecognizer(tap)
         }
         
+        // Our own double tap replaces SceneKit's built-in one (see Coordinator)
+        let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        doubleTap.delegate = context.coordinator
+        view.addGestureRecognizer(doubleTap)
+        
         view.scene = scene
         let frame = Self.ensureSceneSetup(scene)
         view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
@@ -45,7 +51,7 @@ struct SceneKitView: UIViewRepresentable {
         // Recenter when trigger toggles
         if recenterTrigger != context.coordinator.lastRecenter {
             context.coordinator.lastRecenter = recenterTrigger
-            recenterCamera(in: view)
+            context.coordinator.recenter(view)
         }
     }
     
@@ -90,16 +96,15 @@ struct SceneKitView: UIViewRepresentable {
         return frame
     }
     
-    private func recenterCamera(in view: SCNView) {
-        guard let scene = view.scene,
-              let camera = scene.rootNode.childNode(withName: "mainCamera", recursively: true)
-        else { return }
-        let frame = Self.cameraFrame(for: scene)
-        SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.5
-        Self.apply(frame, to: camera)
-        SCNTransaction.commit()
-        view.defaultCameraController.target = frame.center
+    /// A glide from the current point of view back to where the camera starts out.
+    private static func recenterGlide(in view: SCNView) -> CameraGlide? {
+        guard let scene = view.scene, let camera = view.pointOfView else { return nil }
+        let home = SCNNode()
+        let frame = configureCamera(home, in: scene)
+        guard let from = CameraGlide.Shot(camera, orbiting: SIMD3(view.defaultCameraController.target)),
+              let to = CameraGlide.Shot(home, orbiting: SIMD3(frame.center))
+        else { return nil }
+        return CameraGlide(from: from, to: to)
     }
 
     private struct CameraFrame {
@@ -221,11 +226,29 @@ struct SceneKitView: UIViewRepresentable {
         Coordinator(onTap: onTap)
     }
     
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, UIGestureRecognizerDelegate {
         let onTap: (([SCNHitTestResult]) -> Void)?
         var lastRecenter: Bool = false
         init(onTap: (([SCNHitTestResult]) -> Void)?) { self.onTap = onTap }
-        
+
+        func recenter(_ view: SCNView) {
+            guard let camera = view.pointOfView, let glide = SceneKitView.recenterGlide(in: view) else { return }
+            view.defaultCameraController.stopInertia()
+            camera.runAction(glide.action, forKey: CameraGlide.actionKey)
+            view.defaultCameraController.target = SCNVector3(glide.to.pivot)
+        }
+
+        /// Leave the camera wherever the glide got to, orbiting whatever is centered there,
+        /// so it doesn't fight the finger.
+        private func stopGlide(in view: SCNView) {
+            guard let camera = view.pointOfView, camera.action(forKey: CameraGlide.actionKey) != nil else { return }
+            camera.removeAction(forKey: CameraGlide.actionKey)
+            let controller = view.defaultCameraController
+            if let shot = CameraGlide.Shot(camera, orbiting: SIMD3(controller.target)) {
+                controller.target = SCNVector3(shot.pivot)
+            }
+        }
+
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView else { return }
             let loc = gesture.location(in: view)
@@ -234,5 +257,81 @@ struct SceneKitView: UIViewRepresentable {
                 onTap?(hits)
             }
         }
+
+        @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+            guard let view = gesture.view as? SCNView, view.allowsCameraControl else { return }
+            recenter(view)
+        }
+
+        /// The double tap sees every touch-down on the view, so it's where any touch (a drag,
+        /// pinch, or tap) stops a glide in flight.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            if let view = gestureRecognizer.view as? SCNView { stopGlide(in: view) }
+            return true
+        }
+
+        /// SceneKit's camera control has its own double tap that "switches camera" by flying
+        /// the view in a straight line while turning it separately, which swings the brain
+        /// off-center. Make it wait on ours, so it never fires.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
+            (other as? UITapGestureRecognizer)?.numberOfTapsRequired == 2
+        }
+    }
+}
+
+/// Eases the camera between two shots by blending what defines them (facing, pivot, distance,
+/// zoom) and placing the camera from the blend. The pivot stays centered the whole way, so the
+/// brain turns in place instead of the camera sweeping past it.
+nonisolated struct CameraGlide {
+    /// A camera facing `orientation`, `distance` back from the `pivot` it orbits.
+    struct Shot {
+        var orientation: simd_quatf
+        var pivot: SIMD3<Float>
+        var distance: Float
+        var fieldOfView: Float
+
+        var position: SIMD3<Float> { pivot - orientation.act(SIMD3(0, 0, -1)) * distance }
+    }
+
+    static let actionKey = "cameraGlide"
+    static let duration: TimeInterval = 0.6
+
+    let from: Shot
+    let to: Shot
+
+    /// The shot at progress `t` in 0...1; the orientation turns along the shortest arc.
+    func shot(at t: Float) -> Shot {
+        Shot(
+            orientation: simd_slerp(from.orientation, to.orientation, t),
+            pivot: simd_mix(from.pivot, to.pivot, SIMD3(repeating: t)),
+            distance: simd_mix(from.distance, to.distance, t),
+            fieldOfView: simd_mix(from.fieldOfView, to.fieldOfView, t)
+        )
+    }
+
+    var action: SCNAction {
+        SCNAction.customAction(duration: Self.duration) { node, elapsed in
+            let t = Float(Double(elapsed) / Self.duration)
+            let shot = shot(at: t * t * (3 - 2 * t))  // smoothstep: ease in and out
+            node.simdWorldOrientation = shot.orientation
+            node.simdWorldPosition = shot.position
+            node.camera?.fieldOfView = CGFloat(shot.fieldOfView)
+        }
+    }
+}
+
+extension CameraGlide.Shot {
+    /// `node`'s camera as it is now, orbiting the point straight ahead that's as far away as
+    /// `target` (`target` itself when the camera faces it). Nil if `node` has no camera.
+    init?(_ node: SCNNode, orbiting target: SIMD3<Float>) {
+        guard let camera = node.camera else { return nil }
+        let distance = simd_distance(node.simdWorldPosition, target)
+        self.init(
+            orientation: node.simdWorldOrientation,
+            pivot: node.simdWorldPosition + node.simdWorldFront * distance,
+            distance: distance,
+            fieldOfView: Float(camera.fieldOfView)
+        )
     }
 }
