@@ -110,7 +110,6 @@ struct SceneKitView: UIViewRepresentable {
     private struct CameraFrame {
         let center: SCNVector3
         let position: SCNVector3
-        let radius: Float
     }
 
     private struct SceneBounds {
@@ -137,8 +136,8 @@ struct SceneKitView: UIViewRepresentable {
         let frame = cameraFrame(for: scene)
         let camera = cameraNode.camera ?? SCNCamera()
         camera.fieldOfView = 30
-        camera.zNear = 1
-        camera.zFar = Double(max(2000, frame.radius * 8))
+        // Exploding the brain and recentering moves it well past any fixed far plane
+        camera.automaticallyAdjustsZRange = true
         cameraNode.camera = camera
         apply(frame, to: cameraNode)
         return frame
@@ -166,7 +165,7 @@ struct SceneKitView: UIViewRepresentable {
             center.z + viewDirection.z * distance
         )
 
-        return CameraFrame(center: center, position: position, radius: radius)
+        return CameraFrame(center: center, position: position)
     }
 
     private static func sceneContentBounds(_ scene: SCNScene) -> SceneBounds? {
