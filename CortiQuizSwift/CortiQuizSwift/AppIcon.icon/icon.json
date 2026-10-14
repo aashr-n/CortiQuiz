@@ -1,0 +1,29 @@
+{
+  "fill" : {
+    "automatic-gradient" : "srgb:0.23000,0.10000,0.16000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        { "image-name" : "frontal.png", "name" : "frontal", "glass" : true,
+          "fill" : { "solid" : "srgb:0.93000,0.55000,0.66000,1.00000" } }
+      ],
+      "shadow" : { "kind" : "layer-color", "opacity" : 0.6 },
+      "translucency" : { "enabled" : true, "value" : 0.3 }
+    },
+    {
+      "layers" : [
+        { "image-name" : "parietal.png", "name" : "parietal", "glass" : true },
+        { "image-name" : "temporal.png", "name" : "temporal", "glass" : true },
+        { "image-name" : "occipital.png", "name" : "occipital", "glass" : true },
+        { "image-name" : "cerebellum.png", "name" : "cerebellum", "glass" : true },
+        { "image-name" : "brainstem.png", "name" : "brainstem", "glass" : true }
+      ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "translucency" : { "enabled" : true, "value" : 0.4 }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

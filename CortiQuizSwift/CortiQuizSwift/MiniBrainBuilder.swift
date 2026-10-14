@@ -30,7 +30,7 @@ enum MiniBrainBuilder {
     typealias Bounds = MiniBrainBounds
     typealias Result = MiniBrainResult
 
-    /// Build a translucent gray mini-brain scene with slice plane indicator.
+    /// Build an x-ray mini-brain scene (the 3D modes' ghost look) with slice plane indicator.
     /// Call from background thread — result is safe to hand to MainActor.
     nonisolated static func build(
         structures: [BrainStructure],
@@ -44,7 +44,7 @@ enum MiniBrainBuilder {
             guard let fn = s.modelFileName,
                   let node = ModelCache.shared.node(for: fn)
             else { continue }
-            node.applyColor(SceneColors.miniBrain)
+            node.applyStyle(.ghost)
             node.name = s.id
             scene.rootNode.addChildNode(node)
             nodeMap[s.id] = node
@@ -106,10 +106,10 @@ enum MiniBrainBuilder {
         return plane
     }
 
-    /// Color one mini-brain structure, or restore its gray shell with nil. Highlights draw on
-    /// top of the translucent brain so deep structures stay visible.
+    /// Color one mini-brain structure solid, or return it to the x-ray ghost with nil.
+    /// Highlights draw on top of the brain so deep structures stay visible.
     static func highlight(_ node: SCNNode, color: UIColor?) {
-        node.applyColor(color ?? SceneColors.miniBrain)
+        node.applyStyle(color.map { .solid($0) } ?? .ghost)
         drawOnTop(node, color != nil)
     }
 
@@ -117,7 +117,8 @@ enum MiniBrainBuilder {
         node.renderingOrder = onTop ? 50 : 0
         for mat in node.geometry?.materials ?? [] {
             mat.readsFromDepthBuffer = !onTop
-            mat.writesToDepthBuffer = !onTop
+            // Ghosts never write depth (`applyStyle`); a highlight on top mustn't either.
+            if onTop { mat.writesToDepthBuffer = false }
         }
         for child in node.childNodes { drawOnTop(child, onTop) }
     }

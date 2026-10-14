@@ -38,6 +38,11 @@ final class MRIQuizViewModel {
     private var currentTargetID: String?
     private var hasLoaded = false
 
+    /// The structure being asked about (one hemisphere of a pair).
+    var currentTarget: BrainStructure? {
+        currentTargetID.flatMap { indexByID[$0] }.map { structures[$0] }
+    }
+
     /// Builds the scenes and finds quiz-worthy slices off the main actor. Runs from
     /// SwiftUI's `.task`, so leaving the screen mid-load cancels it.
     func load() async {
@@ -206,8 +211,6 @@ struct MRIQuizView: View {
     @State private var vm = MRIQuizViewModel()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let targetDot = Color(SceneColors.mriTargetDim)
-
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -215,77 +218,24 @@ struct MRIQuizView: View {
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading MRI quiz…", failed: vm.loadFailed)
             } else {
-                VStack(spacing: 0) {
-                    ZStack(alignment: .bottomLeading) {
-                        SliceFrame(axis: vm.activeAxis) {
-                            if let imgDim = vm.sliceImageDim {
-                                sliceImage(imgDim)
-                            }
-
-                            if let imgBright = vm.sliceImageBright {
-                                if reduceMotion {
-                                    // Static highlight instead of a pulse.
-                                    sliceImage(imgBright)
-                                } else {
-                                    sliceImage(imgBright)
-                                        .phaseAnimator([false, true]) { content, bright in
-                                            content.opacity(bright ? 1 : 0)
-                                        } animation: { _ in
-                                            .easeInOut(duration: 0.8)
-                                        }
-                                }
-                            }
-                        }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(vm.activeAxis.title) MRI slice with one region highlighted. Identify it.")
-
-                        MiniBrainView(scene: vm.miniBrainScene)
-                            .frame(width: 112, height: 112)
-                            .clipShape(.rect(cornerRadius: 14))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Theme.bgCardStroke, lineWidth: 1)
-                            )
-                            .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
-                            .padding(10)
-                            .accessibilityHidden(true)
-                    }
-                    .overlay(alignment: .topLeading) {
-                        Text("\(vm.activeAxis.title) · \(vm.activeAxis.locationLabel(vm.sliceCoord))")
-                            .font(Theme.captionFont.weight(.medium))
-                            .monospacedDigit()
-                            .foregroundStyle(Theme.textSecondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .glassEffect(.regular, in: .capsule)
-                            .padding(10)
-                    }
-                    .padding(.horizontal)
-
-                    Spacer(minLength: 12)
-
-                    VStack(spacing: 14) {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(Self.targetDot)
-                                .frame(width: 10, height: 10)
-                                .shadow(color: Self.targetDot.opacity(0.8), radius: 4)
-                            Text("Identify the highlighted region")
-                                .font(Theme.headingFont)
-                        }
-
-                        AnswerOptionsView(
-                            options: vm.options,
-                            correctAnswer: vm.correctAnswer,
-                            selectedAnswer: vm.selectedAnswer,
-                            showingFeedback: vm.showingFeedback,
-                            nextDisabled: vm.isPreparing,
-                            onAnswer: { vm.answer($0) },
-                            onNext: { vm.nextQuestion() }
-                        )
-                    }
-                    .animation(.snappy, value: vm.showingFeedback)
-                    .bottomCard()
+                StageLayout {
+                    slice
+                        .padding(12)
+                } panel: {
+                    QuizPanel(
+                        prompt: "Identify the highlighted region",
+                        tip: "The small brain shows where this slice is",
+                        tipIcon: "cube.transparent",
+                        session: vm.session,
+                        options: vm.options,
+                        correctAnswer: vm.correctAnswer,
+                        selectedAnswer: vm.selectedAnswer,
+                        showingFeedback: vm.showingFeedback,
+                        detail: vm.currentTarget?.displayName,
+                        nextDisabled: vm.isPreparing,
+                        onAnswer: { vm.answer($0) },
+                        onNext: { vm.nextQuestion() }
+                    )
                 }
             }
         }
@@ -308,6 +258,53 @@ struct MRIQuizView: View {
             )
         }
         .task { await vm.load() }
+    }
+
+    /// The slice with its target pulsing, where it sits on the mini brain, and its location.
+    private var slice: some View {
+        SliceFrame(axis: vm.activeAxis) {
+            if let imgDim = vm.sliceImageDim {
+                sliceImage(imgDim)
+            }
+
+            if let imgBright = vm.sliceImageBright {
+                if reduceMotion {
+                    // Static highlight instead of a pulse.
+                    sliceImage(imgBright)
+                } else {
+                    sliceImage(imgBright)
+                        .phaseAnimator([false, true]) { content, bright in
+                            content.opacity(bright ? 1 : 0)
+                        } animation: { _ in
+                            .easeInOut(duration: 0.8)
+                        }
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(vm.activeAxis.title) MRI slice with one region highlighted. Identify it.")
+        .overlay(alignment: .bottomLeading) {
+            MiniBrainView(scene: vm.miniBrainScene)
+                .frame(width: 104, height: 104)
+                .clipShape(.rect(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Theme.bgCardStroke, lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+                .padding(10)
+                .accessibilityHidden(true)
+        }
+        .overlay(alignment: .topLeading) {
+            Text("\(vm.activeAxis.title) · \(vm.activeAxis.locationLabel(vm.sliceCoord))")
+                .font(Theme.captionFont.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(Theme.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .glassEffect(.regular, in: .capsule)
+                .padding(10)
+        }
     }
 
     private func sliceImage(_ image: UIImage) -> some View {

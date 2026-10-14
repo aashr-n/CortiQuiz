@@ -13,6 +13,8 @@ final class ExploreViewModel {
     var isLoading = true
     var loadFailed = false
     var recenterTrigger = false
+    /// Something has been selected this visit; the "tap a structure" tip stays away after.
+    private(set) var hasSelected = false
 
     private var structuresByID: [String: BrainStructure] = [:]
     private var structureNodes: [String: SCNNode] = [:]
@@ -31,7 +33,7 @@ final class ExploreViewModel {
         guard !hasLoaded else { return }
         let loaded = await Background.run {
             BrainSceneLoader.load { node, s in
-                node.applyColor(UIColor(s.color))
+                node.applyStyle(.solid(UIColor(s.color)))
             }
         }
         guard !Task.isCancelled else { return }
@@ -53,20 +55,19 @@ final class ExploreViewModel {
     func select(_ structure: BrainStructure) {
         Theme.tapHaptic()
         selectedStructure = structure
+        hasSelected = true
         restyleNodes(structureNodes) { id in
-            id == structure.id
-                ? (SceneColors.selection, 1.0)
-                : (SceneColors.ghost, SceneColors.ghostOpacity)
+            id == structure.id ? .solid(SceneColors.selection) : .ghost
         }
     }
 
-    /// Hits arrive nearest-first. While something is selected everything else is a faded
-    /// ghost, so prefer the first fully opaque hit — that keeps the highlighted structure
-    /// tappable through the translucent cortex in front of it.
+    /// Hits arrive nearest-first. While something is selected everything else is an x-ray
+    /// ghost, so prefer the selected structure — that keeps it tappable through the cortex
+    /// in front of it.
     func handleTap(_ hits: [SCNHitTestResult]) {
         let ids = hits.compactMap { structureID(for: $0.node) }
-        let opaque = ids.first { (structureNodes[$0]?.opacity ?? 0) > 0.99 }
-        if let id = opaque ?? ids.first, let structure = structuresByID[id] {
+        let preferred = ids.first { $0 == selectedStructure?.id }
+        if let id = preferred ?? ids.first, let structure = structuresByID[id] {
             select(structure)
         }
     }
@@ -84,7 +85,7 @@ final class ExploreViewModel {
     func clearSelection() {
         selectedStructure = nil
         restyleNodes(structureNodes) { id in
-            (structuresByID[id].map { UIColor($0.color) } ?? SceneColors.ghost, 1.0)
+            .solid(structuresByID[id].map { UIColor($0.color) } ?? SceneColors.ghost)
         }
     }
 
@@ -115,6 +116,14 @@ struct ExploreView: View {
 
                 VStack(spacing: 12) {
                     Spacer()
+                    if !vm.hasSelected {
+                        Label("Tap any structure to name it", systemImage: "hand.tap.fill")
+                            .font(.subheadline.weight(.medium))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .glassEffect(.regular, in: .capsule)
+                            .transition(.blurReplace)
+                    }
                     SceneControlsBar(
                         explodeFactor: Binding(get: { vm.explodeFactor }, set: { vm.setExplode($0) }),
                         onRecenter: { vm.recenterTrigger.toggle() }
@@ -124,9 +133,11 @@ struct ExploreView: View {
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
+                .frame(maxWidth: Theme.Metrics.panelMaxWidth)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
                 .animation(.snappy, value: vm.selectedStructure?.id)
+                .animation(.snappy, value: vm.hasSelected)
             }
         }
         .searchable(text: $vm.searchQuery, isPresented: $searching,
@@ -140,13 +151,22 @@ struct ExploreView: View {
                     searching = false
                 } label: {
                     Label {
-                        Text(s.name)
-                            .foregroundStyle(Theme.textPrimary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(s.displayName)
+                                .foregroundStyle(Theme.textPrimary)
+                            if let region = s.hierarchyPath.last {
+                                Text(region.sentenceCased)
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        }
                     } icon: {
-                        Image(systemName: "circle.fill")
-                            .foregroundStyle(s.color)
+                        Circle()
+                            .fill(s.color)
+                            .frame(width: 12, height: 12)
                     }
                 }
+                .accessibilityLabel(s.displayName)
             }
         }
         .autocorrectionDisabled()
@@ -165,29 +185,14 @@ private struct SelectionCard: View {
             Circle()
                 .fill(Color(SceneColors.selection))
                 .frame(width: 12, height: 12)
+                .shadow(color: Color(SceneColors.selection).opacity(0.7), radius: 4)
                 .padding(.top, 5)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(structure.name)
-                    .font(Theme.headingFont)
-                if !structure.hierarchyPath.isEmpty {
-                    Text(structure.hierarchyPath.joined(separator: " › "))
-                        .font(Theme.captionFont)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(2)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Button(action: onClear) {
-                Label("Clear selection", systemImage: "xmark")
-                    .labelStyle(.iconOnly)
-                    .font(.footnote.weight(.bold))
-                    .frame(width: 18, height: 18)
-            }
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .tint(.secondary)
+            StructureTitle(name: structure.displayName, breadcrumb: structure.breadcrumb)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ClearButton(label: "Clear selection", action: onClear)
         }
         .padding(16)
         .glassEffect(.regular, in: .rect(corners: .concentric(minimum: 24), isUniform: false))

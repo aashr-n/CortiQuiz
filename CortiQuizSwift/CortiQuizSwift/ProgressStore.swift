@@ -62,6 +62,41 @@ final class ProgressStore {
 
     var accuracy: Double { totalAnswered == 0 ? 0 : Double(totalCorrect) / Double(totalAnswered) }
 
+    /// How well a structure is known, from its quiz record.
+    enum Mastery: Int, Comparable {
+        /// Never asked in a quiz.
+        case unseen
+        /// Asked, but not yet answered reliably.
+        case learning
+        /// Answered correctly at least twice, at 80% or better, and not waiting for review.
+        case mastered
+
+        static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+    }
+
+    func mastery(of baseName: String) -> Mastery {
+        guard let stat = stats[baseName], stat.seen > 0 else { return .unseen }
+        if stat.correct >= 2, stat.accuracy >= 0.8, !reviewQueue.contains(baseName) { return .mastered }
+        return .learning
+    }
+
+    /// Every structure that isn't `.unseen`, keyed by baseName.
+    var masteryByName: [String: Mastery] {
+        Dictionary(uniqueKeysWithValues: stats.keys.map { ($0, mastery(of: $0)) }.filter { $0.1 != .unseen })
+    }
+
+    var masteredCount: Int { stats.keys.count(where: { mastery(of: $0) == .mastered }) }
+
+    /// Forget everything: stats, streak, and the review queue.
+    func reset() {
+        stats = [:]
+        bestStreak = 0
+        totalAnswered = 0
+        totalCorrect = 0
+        reviewQueue = []
+        defaults.removeObject(forKey: defaultsKey)
+    }
+
     /// Structures you miss most often (seen a few times, with at least one miss),
     /// worst accuracy first. Used to nudge study focus.
     func weakestStructures(limit: Int = 3) -> [String] {

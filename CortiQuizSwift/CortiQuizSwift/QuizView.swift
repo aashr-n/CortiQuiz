@@ -33,7 +33,7 @@ final class QuizViewModel {
         guard !hasLoaded else { return }
         let loaded = await Background.run {
             BrainSceneLoader.load { node, _ in
-                node.applyColor(SceneColors.ghost)
+                node.applyStyle(.ghost)
             }
         }
         guard !Task.isCancelled else { return }
@@ -112,16 +112,19 @@ final class QuizViewModel {
         let selected = selectedAnswer
         let selectedIsCorrect = selected == correctAnswer
 
-        restyleNodes(structureNodes) { id in
+        // No fade for the first question: the scene isn't on screen yet.
+        restyleNodes(structureNodes, duration: isLoading ? 0 : 0.25) { id in
             if id == targetID {
-                return (feedback ? SceneColors.correct : SceneColors.target, 1.0)
+                return .solid(feedback ? SceneColors.correct : SceneColors.target)
             }
             if feedback, let selected, structuresByID[id]?.baseName == selected {
-                return selectedIsCorrect
-                    ? (SceneColors.pairedCorrect, SceneColors.pairedCorrectOpacity)
-                    : (SceneColors.incorrect, 1.0)
+                return .solid(selectedIsCorrect ? SceneColors.pairedCorrect : SceneColors.incorrect)
             }
-            return (SceneColors.ghost, SceneColors.ghostOpacity)
+            return .ghost
+        }
+        // Draw the eye to a new question's structure; small ones are easy to miss.
+        if let targetID, let node = structureNodes[targetID] {
+            if feedback { node.stopPulse() } else { node.pulseHighlight() }
         }
     }
 }
@@ -138,10 +141,9 @@ struct QuizView: View {
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading quiz…", failed: vm.loadFailed)
             } else {
-                VStack(spacing: 0) {
+                StageLayout {
                     ZStack(alignment: .bottom) {
                         SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
-                            .frame(maxHeight: .infinity)
                             .accessibilityLabel("3D brain with one structure highlighted in red. Rotate to inspect.")
 
                         SceneControlsBar(
@@ -150,30 +152,19 @@ struct QuizView: View {
                         )
                         .padding(12)
                     }
-
-                    VStack(spacing: 14) {
-                        VStack(spacing: 2) {
-                            Text("What structure is highlighted?")
-                                .font(Theme.headingFont)
-                            // After answering, the exact structure (with its hemisphere).
-                            if let target = vm.currentTarget, vm.showingFeedback {
-                                Text(target.name)
-                                    .font(Theme.bodyFont)
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
-                        }
-
-                        AnswerOptionsView(
-                            options: vm.options,
-                            correctAnswer: vm.correctAnswer,
-                            selectedAnswer: vm.selectedAnswer,
-                            showingFeedback: vm.showingFeedback,
-                            onAnswer: { vm.answer($0) },
-                            onNext: { vm.nextQuestion() }
-                        )
-                    }
-                    .animation(.snappy, value: vm.showingFeedback)
-                    .bottomCard()
+                } panel: {
+                    QuizPanel(
+                        prompt: "What structure is highlighted?",
+                        tip: "Drag to turn the brain, pinch to zoom",
+                        session: vm.session,
+                        options: vm.options,
+                        correctAnswer: vm.correctAnswer,
+                        selectedAnswer: vm.selectedAnswer,
+                        showingFeedback: vm.showingFeedback,
+                        detail: vm.currentTarget?.displayName,
+                        onAnswer: { vm.answer($0) },
+                        onNext: { vm.nextQuestion() }
+                    )
                 }
             }
         }

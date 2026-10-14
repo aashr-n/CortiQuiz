@@ -182,6 +182,7 @@ struct QuizSessionTests {
         #expect(session.streak == 1)
         #expect(session.bestStreak == 2)
         #expect(session.missed == ["amygdala"])
+        #expect(session.results == [true, true, false, false, true])
         #expect(session.isFinished)
     }
 
@@ -248,6 +249,62 @@ struct ProgressStoreTests {
         #expect(store.bestStreak == 4)
         #expect(store.reviewQueue.isEmpty)
         #expect(store.weakestStructures() == ["putamen"])
+    }
+
+    @Test func masteryNeedsTwoCorrectAnswersAtEightyPercent() {
+        let store = ProgressStore(defaults: defaults)
+        #expect(store.mastery(of: "pons") == .unseen)
+
+        store.record(baseName: "pons", correct: true, streak: 1)
+        #expect(store.mastery(of: "pons") == .learning)
+        store.record(baseName: "pons", correct: true, streak: 2)
+        #expect(store.mastery(of: "pons") == .mastered)
+        store.record(baseName: "pons", correct: false, streak: 0)   // 2 of 3
+        #expect(store.mastery(of: "pons") == .learning)
+
+        #expect(store.masteredCount == 0)
+        #expect(store.masteryByName == ["pons": .learning])
+    }
+
+    @Test func flaggedStructuresAreNotMastered() {
+        let store = ProgressStore(defaults: defaults)
+        store.record(baseName: "pons", correct: true, streak: 1)
+        store.record(baseName: "pons", correct: true, streak: 2)
+        store.flagForReview("pons")
+        #expect(store.mastery(of: "pons") == .learning)
+    }
+
+    @Test func resetForgetsEverything() {
+        let store = ProgressStore(defaults: defaults)
+        store.record(baseName: "pons", correct: true, streak: 5)
+        store.flagForReview("amygdala")
+        store.reset()
+
+        for s in [store, ProgressStore(defaults: defaults)] {
+            #expect(s.totalAnswered == 0)
+            #expect(s.bestStreak == 0)
+            #expect(s.reviewQueue.isEmpty)
+            #expect(s.stats.isEmpty)
+        }
+    }
+}
+
+// MARK: - Display names
+
+struct DisplayNameTests {
+
+    @Test func namesAreSentenceCased() {
+        #expect("left putamen".sentenceCased == "Left putamen")
+        #expect("VIIA crusI-l1".sentenceCased == "VIIA crusI-l1")
+        #expect("".sentenceCased == "")
+        #expect(structure("#lp", "left putamen").displayName == "Left putamen")
+    }
+
+    @Test func breadcrumbDropsTheBrainRoot() {
+        let path = ["Brain", "prosencephalon", "telencephalon", "left cerebral hemisphere"]
+        #expect(BrainStructure.breadcrumb(path) == "Prosencephalon › Telencephalon › Left cerebral hemisphere")
+        #expect(BrainStructure.breadcrumb(path, bothSides: true) == "Prosencephalon › Telencephalon › Cerebral hemisphere")
+        #expect(BrainStructure.breadcrumb(["Brain"]) == "")
     }
 }
 

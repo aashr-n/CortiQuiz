@@ -2,7 +2,7 @@ Brain Anatomy Game
 A study tool built to help users memorize the anatomy of the human brain through interactive 3D exploration and quizzing. It's powered by the SPL/PNL/NAC Brain Atlas (2017), an open-source dataset containing hundreds of individually labeled brain structures as 3D models, along with MRI volume data.
 
 Main Menu
-The app opens to a simple menu with five modes: Learn Mode, Normal Mode, Explore Mode, MRI Mode, and MRI Quiz. The menu also shows lifetime study stats (questions answered, accuracy, best streak) once you've played.
+The app opens to a simple menu with five modes: Learn Mode, Normal Mode, Explore Mode, MRI Mode, and MRI Quiz. Above them, the atlas brain turns slowly, every gyrus outlined in a soft glow; structures you've answered in quizzes light up on it (gold once mastered), so it doubles as a map of what you know. The menu also shows lifetime study stats (questions answered, accuracy, structures mastered, best streak) once you've played, or a Start Here card on first launch. On iPad the menu is a sidebar beside the open mode.
 
 Learn Mode — Flashcards
 A no-pressure study deck. One structure (both hemispheres for left/right pairs) is highlighted in the ghost brain; you try to recall it, reveal the name and its place in the hierarchy, then mark it "Got it" or "Study again". Cards you've been missing in quizzes come first, and "Study again" cards are re-queued and also flagged so the next quiz asks them first.

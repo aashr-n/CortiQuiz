@@ -70,6 +70,8 @@ struct QuizSession {
     private(set) var score = 0
     private(set) var streak = 0
     private(set) var bestStreak = 0
+    /// Whether each answered question was right, in order.
+    private(set) var results: [Bool] = []
     /// Correct answers the user got wrong, without duplicates, in the order missed.
     private(set) var missed: [String] = []
     /// baseNames already asked, so a session never repeats a structure.
@@ -92,6 +94,7 @@ struct QuizSession {
 
     mutating func record(correctAnswer: String, wasCorrect: Bool) {
         answered += 1
+        results.append(wasCorrect)
         if wasCorrect {
             score += 1
             streak += 1
@@ -123,15 +126,123 @@ struct ScoreLabel: View {
     }
 }
 
-/// Multiple-choice buttons with correct/incorrect feedback, then "Next" once answered.
+/// The question area shared by both quizzes: session progress, the prompt (the verdict once
+/// answered), the answer options, and an action row that shows a tip until Next replaces it.
+/// Both states get the same space, so the panel and the stage above it keep their size.
+/// The verdict is only built once answered: it names the structure.
+struct QuizPanel: View {
+    let prompt: String
+    let tip: String
+    var tipIcon = "hand.draw"
+    let session: QuizSession
+    let options: [String]
+    let correctAnswer: String
+    let selectedAnswer: String?
+    let showingFeedback: Bool
+    /// The structure asked about with its hemisphere ("Left putamen"), shown with the verdict.
+    var detail: String?
+    var nextDisabled = false
+    let onAnswer: (String) -> Void
+    let onNext: () -> Void
+
+    private var answeredCorrectly: Bool { selectedAnswer == correctAnswer }
+
+    /// Room for the verdict's two lines, and for the Next button.
+    @ScaledMetric(relativeTo: .headline) private var headerHeight: CGFloat = 46
+    @ScaledMetric(relativeTo: .headline) private var actionHeight: CGFloat = 52
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SessionProgressBar(results: session.results, total: session.length)
+                .padding(.horizontal, 2)
+
+            Group {
+                if showingFeedback {
+                    verdict
+                } else {
+                    Text(prompt)
+                        .font(Theme.headingFont)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .transition(.blurReplace)
+            .frame(minHeight: headerHeight)
+
+            AnswerOptionsView(
+                options: options,
+                correctAnswer: correctAnswer,
+                selectedAnswer: selectedAnswer,
+                showingFeedback: showingFeedback,
+                onAnswer: onAnswer
+            )
+
+            Group {
+                if showingFeedback {
+                    nextButton
+                        .transition(.scale(0.92).combined(with: .opacity))
+                } else {
+                    Label(tip, systemImage: tipIcon)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textTertiary)
+                        .transition(.opacity)
+                }
+            }
+            .frame(minHeight: actionHeight)
+        }
+        .animation(.snappy, value: showingFeedback)
+    }
+
+    /// "Correct" or "Not quite", the exact structure, and the streak once it's worth noting.
+    private var verdict: some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 8) {
+                Label(answeredCorrectly ? "Correct" : "Not quite",
+                      systemImage: answeredCorrectly ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .font(Theme.headingFont)
+                    .foregroundStyle(answeredCorrectly ? Theme.correct : Theme.incorrect)
+                    .symbolEffect(.bounce, value: showingFeedback)
+                if answeredCorrectly, session.streak >= 3 {
+                    Label("\(session.streak) in a row", systemImage: "flame.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.orange.opacity(0.16), in: .capsule)
+                }
+            }
+            if let detail {
+                Text(detail)
+                    .font(Theme.bodyFont)
+                    .foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var nextButton: some View {
+        Button(action: onNext) {
+            HStack(spacing: 6) {
+                Text(session.isFinished ? "See Results" : "Next")
+                Image(systemName: session.isFinished ? "flag.checkered" : "arrow.right")
+            }
+            .font(Theme.headingFont)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .disabled(nextDisabled)
+        .accessibilityLabel(session.isFinished ? "See Results" : "Next")
+    }
+}
+
+/// Multiple-choice buttons with correct/incorrect feedback.
 struct AnswerOptionsView: View {
     let options: [String]
     let correctAnswer: String
     let selectedAnswer: String?
     let showingFeedback: Bool
-    var nextDisabled = false
     let onAnswer: (String) -> Void
-    let onNext: () -> Void
 
     var body: some View {
         GlassEffectContainer(spacing: 8) {
@@ -141,7 +252,7 @@ struct AnswerOptionsView: View {
                         onAnswer(option)
                     } label: {
                         HStack {
-                            Text(option)
+                            Text(option.sentenceCased)
                                 .font(Theme.bodyFont.weight(.medium))
                                 .multilineTextAlignment(.leading)
                             Spacer(minLength: 8)
@@ -152,24 +263,9 @@ struct AnswerOptionsView: View {
                     .buttonStyle(AnswerButtonStyle(tint: tint(for: option)))
                     .disabled(showingFeedback)
                     .accessibilityIdentifier("answerOption")
+                    .accessibilityValue(accessibilityValue(for: option))
                 }
             }
-        }
-
-        if showingFeedback {
-            Button(action: onNext) {
-                HStack(spacing: 6) {
-                    Text("Next")
-                    Image(systemName: "arrow.right")
-                }
-                .font(Theme.headingFont)
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.large)
-            .disabled(nextDisabled)
-            .accessibilityLabel("Next")
-            .transition(.scale(0.9).combined(with: .opacity))
         }
     }
 
@@ -196,6 +292,13 @@ struct AnswerOptionsView: View {
         if option == correctAnswer { return Theme.correct.opacity(0.45) }
         if option == selectedAnswer { return Theme.incorrect.opacity(0.45) }
         return nil
+    }
+
+    private func accessibilityValue(for option: String) -> String {
+        guard showingFeedback else { return "" }
+        if option == correctAnswer { return option == selectedAnswer ? "Your answer, correct" : "Correct answer" }
+        if option == selectedAnswer { return "Your answer, incorrect" }
+        return ""
     }
 }
 
@@ -228,6 +331,7 @@ struct QuizResultsView: View {
 
     private var headline: String {
         switch Int((fraction * 100).rounded()) {
+        case 100: return "Perfect Round"
         case 90...: return "Outstanding"
         case 70..<90: return "Well Done"
         case 50..<70: return "Keep Going"
@@ -237,26 +341,41 @@ struct QuizResultsView: View {
 
     var body: some View {
         SummarySheet(actionTitle: "Play Again", action: onPlayAgain, onDone: onDone) {
-            Text(headline)
-                .font(Theme.titleFont)
+            VStack(spacing: 4) {
+                Text(headline)
+                    .font(Theme.displayFont)
+                Text("You named \(score) of \(total) structures.")
+                    .font(Theme.bodyFont)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .multilineTextAlignment(.center)
+            .accessibilityElement(children: .combine)
 
-            ScoreRing(fraction: fraction, caption: "correct", lineWidth: 12)
-                .frame(width: 120, height: 120)
+            ScoreRing(fraction: fraction, caption: "correct", lineWidth: 14)
+                .frame(width: 148, height: 148)
+                .padding(.vertical, 4)
 
             HStack(spacing: 12) {
-                statTile("Score", "\(score) of \(total)", icon: "star.fill", color: Theme.scoreGold)
-                statTile("Best Streak", "\(bestStreak)", icon: "flame.fill", color: .orange)
+                StatTile(label: "Score", value: "\(score) of \(total)", icon: "star.fill", color: Theme.scoreGold)
+                StatTile(label: "Best Streak", value: "\(bestStreak)", icon: "flame.fill", color: .orange)
             }
 
-            if !missed.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Review These")
+            if missed.isEmpty {
+                Label("Every structure named. Try the other quiz next.", systemImage: "sparkles")
+                    .font(Theme.bodyFont)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .background(Theme.bgCard, in: .rect(cornerRadius: Theme.Metrics.cardRadius))
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Missed This Round")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.textSecondary)
                         .textCase(.uppercase)
                     ForEach(missed, id: \.self) { name in
                         Label {
-                            Text(name)
+                            Text(name.sentenceCased)
                                 .font(Theme.bodyFont)
                         } icon: {
                             Image(systemName: "arrow.uturn.backward.circle.fill")
@@ -266,23 +385,8 @@ struct QuizResultsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
-                .background(Theme.bgCard, in: .rect(cornerRadius: 20))
+                .background(Theme.bgCard, in: .rect(cornerRadius: Theme.Metrics.cardRadius))
             }
         }
-    }
-
-    private func statTile(_ label: String, _ value: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(label, systemImage: icon)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(color)
-            Text(value)
-                .font(.system(.title2, design: .rounded).weight(.bold))
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Theme.bgCard, in: .rect(cornerRadius: 20))
-        .accessibilityElement(children: .combine)
     }
 }

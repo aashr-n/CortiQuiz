@@ -9,7 +9,7 @@ struct SceneKitView: UIViewRepresentable {
     var recenterTrigger: Bool = false  // Toggle to trigger recenter
     
     func makeUIView(context: Context) -> SCNView {
-        let view = SCNView()
+        let view = StageSCNView()
         view.autoenablesDefaultLighting = false
         view.backgroundColor = .black
         view.antialiasingMode = .multisampling4X
@@ -35,16 +35,18 @@ struct SceneKitView: UIViewRepresentable {
         let frame = Self.ensureSceneSetup(scene)
         view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
         view.defaultCameraController.target = frame.center
+        view.revealWhenPrepared(scene)
         context.coordinator.lastRecenter = recenterTrigger
         return view
     }
-    
+
     func updateUIView(_ view: SCNView, context: Context) {
         if view.scene !== scene {
             view.scene = scene
             let frame = Self.ensureSceneSetup(scene)
             view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
             view.defaultCameraController.target = frame.center
+            view.revealWhenPrepared(scene)
         }
         view.allowsCameraControl = allowsCameraControl
         
@@ -158,7 +160,9 @@ struct SceneKitView: UIViewRepresentable {
         let radius = bounds?.radius ?? 110
         let viewDirection = normalized(SCNVector3(0.42, 0.84, 0.32))
         let fieldOfView = Float(30.0 * Double.pi / 180.0)
-        let distance = max(radius / sin(fieldOfView / 2) * 1.18, 280)
+        // The bounding sphere is much rounder than the brain, so fitting it a little tight
+        // still leaves a margin around the brain from every side.
+        let distance = max(radius / sin(fieldOfView / 2) * 0.9, 280)
         let position = SCNVector3(
             center.x + viewDirection.x * distance,
             center.y + viewDirection.y * distance,
@@ -275,6 +279,39 @@ struct SceneKitView: UIViewRepresentable {
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
             (other as? UITapGestureRecognizer)?.numberOfTapsRequired == 2
+        }
+    }
+}
+
+/// Applies the camera's field of view to the view's narrower side. SceneKit measures it
+/// vertically by default, so in a view taller than it is wide (an iPad's side-by-side layout)
+/// the brain would spill off the sides.
+private final class StageSCNView: SCNView {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        fitFieldOfViewToNarrowSide()
+    }
+
+    override var pointOfView: SCNNode? {
+        didSet { fitFieldOfViewToNarrowSide() }
+    }
+
+    private func fitFieldOfViewToNarrowSide() {
+        guard let camera = pointOfView?.camera, bounds.width > 0, bounds.height > 0 else { return }
+        camera.projectionDirection = bounds.width < bounds.height ? .horizontal : .vertical
+    }
+}
+
+extension SCNView {
+    /// Hide the view until SceneKit has uploaded `scene` to the GPU and compiled its shaders,
+    /// then fade it in, so a new scene never shows up as a blank frame first.
+    func revealWhenPrepared(_ scene: SCNScene) {
+        alpha = 0
+        prepare([scene]) { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self, self.scene === scene else { return }
+                UIView.animate(withDuration: 0.35) { self.alpha = 1 }
+            }
         }
     }
 }

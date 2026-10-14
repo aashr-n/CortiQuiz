@@ -1,5 +1,21 @@
 # CortiQuiz — To Do
 
+## UI refresh (2026-10-13) — needs you
+
+Details in `codenotes.md` → "UI Refresh".
+
+1. **Try it on a real iPhone and iPad.** Simulators can't tell you how it feels: the hero brain's turn (2M triangles at 30 fps), the x-ray ghost and target pulse, haptics, and the card flip. Check that an older device keeps the hero smooth; if not, lower `HeroSceneView.preferredFramesPerSecond` or hide more deep structures in `HeroBrainModel.load`.
+2. **Look over the new app icon** (`CortiQuizSwift/CortiQuizSwift/AppIcon.icon`) in Icon Composer (Xcode → Open Developer Tool). Glass, shadow, and the frontal lobe's pink live in `icon.json`; the lobe shapes come from `python3 tools/icon/make_icon_layers.py`. The old bitmap `AppIcon.appiconset` was removed (it's in git history).
+3. **Review and commit.** Nothing from the refresh is committed.
+
+Not done (deliberately), but worth considering for an Apple Design Award submission:
+- **App Shortcuts / Siri** ("Start a CortiQuiz quiz") via App Intents, opening a mode through the menu's selection.
+- **Localization**: move strings into a String Catalog. The atlas's structure names would need translations too.
+- **Light appearance**: the app is dark-only by design (3D stage, MRI conventions). Supporting light mode means light variants of the menu, panels, and icon artwork.
+- **App Store screenshots**: the UI tests already capture every screen (`xcrun xcresulttool export attachments`).
+
+---
+
 Follow-ups from the 2026-10-04 code review and fixes (details in `codenotes.md` → "Review Fixes").
 
 ## Needs you

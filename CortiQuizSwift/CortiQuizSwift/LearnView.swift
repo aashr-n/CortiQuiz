@@ -12,8 +12,14 @@ fileprivate struct LearnCard: Identifiable, Hashable {
     let hierarchyPath: [String]
     /// Highlights on both sides of the brain (left + right exist).
     var hasPair: Bool { nodeIDs.count > 1 }
+    var displayName: String { baseName.sentenceCased }
+    /// Where it sits in the atlas; a pair's path drops "left"/"right".
+    var breadcrumb: String { BrainStructure.breadcrumb(hierarchyPath, bothSides: hasPair) }
     /// Broad region, shown as an optional hint (the immediate parent group).
-    var region: String { hierarchyPath.last ?? "" }
+    var region: String {
+        let parent = hierarchyPath.last ?? ""
+        return (hasPair ? BrainStructure.computeBaseName(parent) : parent).sentenceCased
+    }
 }
 
 // MARK: - Learn ViewModel
@@ -53,7 +59,7 @@ final class LearnViewModel {
         guard !hasLoaded else { return }
         let loaded = await Background.run {
             BrainSceneLoader.load { node, _ in
-                node.applyColor(SceneColors.ghost)
+                node.applyStyle(.ghost)
             }
         }
         guard !Task.isCancelled else { return }
@@ -151,10 +157,13 @@ final class LearnViewModel {
         let targets = Set(card.nodeIDs)
         let highlight = revealed ? SceneColors.revealed : SceneColors.target
 
-        restyleNodes(structureNodes) { id in
-            targets.contains(id)
-                ? (highlight, 1.0)
-                : (SceneColors.ghost, SceneColors.ghostOpacity)
+        // No fade for the first card: the scene isn't on screen yet.
+        restyleNodes(structureNodes, duration: isLoading ? 0 : 0.25) { id in
+            targets.contains(id) ? .solid(highlight) : .ghost
+        }
+        // Draw the eye to a new card's structure; small ones are easy to miss.
+        for id in card.nodeIDs {
+            if revealed { structureNodes[id]?.stopPulse() } else { structureNodes[id]?.pulseHighlight() }
         }
     }
 
@@ -168,6 +177,9 @@ final class LearnViewModel {
 
 struct LearnView: View {
     @State private var vm = LearnViewModel()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// About the taller face (the answer), so revealing doesn't resize the stage.
+    @ScaledMetric(relativeTo: .title2) private var cardHeight: CGFloat = 150
 
     var body: some View {
         ZStack {
@@ -176,16 +188,9 @@ struct LearnView: View {
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading study deck…", failed: vm.loadFailed)
             } else {
-                VStack(spacing: 0) {
-                    ProgressView(value: Double(vm.learnedCount), total: Double(max(vm.totalCount, 1)))
-                        .tint(Theme.accent)
-                        .padding(.horizontal)
-                        .padding(.vertical, 6)
-                        .accessibilityLabel("Learned \(vm.learnedCount) of \(vm.totalCount)")
-
+                StageLayout {
                     ZStack(alignment: .bottom) {
                         SceneKitView(scene: vm.scene, recenterTrigger: vm.recenterTrigger)
-                            .frame(maxHeight: .infinity)
                             .accessibilityLabel("3D brain with one structure highlighted. Rotate to inspect, then reveal the name.")
 
                         SceneControlsBar(
@@ -194,14 +199,19 @@ struct LearnView: View {
                         )
                         .padding(12)
                     }
+                } panel: {
+                    VStack(spacing: 16) {
+                        ProgressView(value: Double(vm.learnedCount), total: Double(max(vm.totalCount, 1)))
+                            .tint(Theme.accent)
+                            .animation(.snappy, value: vm.learnedCount)
+                            .accessibilityLabel("Learned \(vm.learnedCount) of \(vm.totalCount)")
 
-                    studyCard
-                        .animation(.snappy, value: vm.revealed)
-                        .bottomCard()
+                        studyCard
+                    }
                 }
             }
         }
-        .navigationSubtitle(vm.isLoading ? "" : "\(vm.learnedCount) of \(vm.totalCount) learned · no score")
+        .navigationSubtitle(vm.isLoading ? "" : "\(vm.learnedCount) of \(vm.totalCount) learned")
         .sessionSummary(isPresented: $vm.sessionComplete) { done in
             completionSummary(onDone: done)
         }
@@ -210,75 +220,96 @@ struct LearnView: View {
 
     // MARK: Study card (front = recall prompt, back = answer + self-rating)
 
-    @ViewBuilder
+    /// Flips over from the prompt to the answer. Only the face showing is built, so the
+    /// answer isn't on screen (or read by VoiceOver) before Reveal.
     private var studyCard: some View {
-        if vm.revealed, let card = vm.currentCard {
-            VStack(spacing: 16) {
-                VStack(spacing: 4) {
-                    Text(card.baseName)
-                        .font(Theme.titleFont)
-                        .multilineTextAlignment(.center)
-                    if card.hasPair {
-                        Text("Appears in both hemispheres")
-                            .font(Theme.captionFont)
-                            .foregroundStyle(Theme.textTertiary)
-                    }
-                    if !card.hierarchyPath.isEmpty {
-                        Text(card.hierarchyPath.joined(separator: " › "))
-                            .font(Theme.captionFont)
+        ZStack {
+            if vm.revealed, let card = vm.currentCard {
+                back(card)
+                    .transition(reduceMotion ? .opacity : AnyTransition(CardFlip(isBack: true)))
+            } else {
+                front
+                    .transition(reduceMotion ? .opacity : AnyTransition(CardFlip(isBack: false)))
+            }
+        }
+        .frame(minHeight: cardHeight)
+        // A new card starts face down without flipping back over. (Inner to the animation
+        // below, so it wins when both change.)
+        .transaction(value: vm.currentCard?.id) { $0.animation = nil }
+        .animation(.spring(duration: 0.55, bounce: 0.2), value: vm.revealed)
+    }
+
+    private var front: some View {
+        VStack(spacing: 14) {
+            Text("What structure is highlighted?")
+                .font(Theme.headingFont)
+                .multilineTextAlignment(.center)
+
+            Group {
+                if let region = vm.currentCard?.region, !region.isEmpty {
+                    if vm.hintShown {
+                        Label(region, systemImage: "lightbulb.fill")
                             .foregroundStyle(Theme.textSecondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
+                            .transition(.blurReplace)
+                    } else {
+                        Button("Need a hint?") { vm.showHint() }
+                            .transition(.blurReplace)
                     }
                 }
-
-                GlassEffectContainer(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Button { vm.markReview() } label: {
-                            Label("Study again", systemImage: "arrow.uturn.backward")
-                                .font(Theme.headingFont)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glass)
-
-                        Button { vm.markKnown() } label: {
-                            Label("Got it", systemImage: "checkmark")
-                                .font(Theme.headingFont)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .tint(Theme.correct.mix(with: .black, by: 0.25))
-                    }
-                    .controlSize(.large)
-                }
             }
-        } else {
-            VStack(spacing: 14) {
-                Text("What structure is highlighted?")
-                    .font(Theme.headingFont)
-                    .multilineTextAlignment(.center)
-
-                if vm.hintShown, let region = vm.currentCard?.region, !region.isEmpty {
-                    Label(region, systemImage: "lightbulb.fill")
-                        .font(Theme.bodyFont)
-                        .foregroundStyle(Theme.textSecondary)
-                        .transition(.opacity)
-                }
-
-                Button { vm.reveal() } label: {
-                    Text("Reveal")
-                        .font(Theme.headingFont)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-
-                if let region = vm.currentCard?.region, !region.isEmpty, !vm.hintShown {
-                    Button("Need a hint?") { vm.showHint() }
-                        .font(Theme.bodyFont)
-                }
-            }
+            .font(Theme.bodyFont)
             .animation(.easeInOut(duration: 0.2), value: vm.hintShown)
+
+            Button { vm.reveal() } label: {
+                Text("Reveal")
+                    .font(Theme.headingFont)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
+        }
+    }
+
+    private func back(_ card: LearnCard) -> some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 6) {
+                Text(card.displayName)
+                    .font(Theme.titleFont)
+                    .multilineTextAlignment(.center)
+                if card.hasPair {
+                    Label("Both hemispheres", systemImage: "circle.lefthalf.filled")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.accent)
+                }
+                if !card.breadcrumb.isEmpty {
+                    Text(card.breadcrumb)
+                        .font(Theme.captionFont)
+                        .foregroundStyle(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    Button { vm.markReview() } label: {
+                        Label("Study again", systemImage: "arrow.uturn.backward")
+                            .font(Theme.headingFont)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glass)
+
+                    Button { vm.markKnown() } label: {
+                        Label("Got it", systemImage: "checkmark")
+                            .font(Theme.headingFont)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(Theme.correct.mix(with: .black, by: 0.25))
+                }
+                .controlSize(.large)
+            }
         }
     }
 
@@ -287,31 +318,69 @@ struct LearnView: View {
     private func completionSummary(onDone: @escaping () -> Void) -> some View {
         SummarySheet(actionTitle: "Study Again", action: { vm.startSession() }, onDone: onDone) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 56))
+                .font(.system(size: 60))
                 .foregroundStyle(Theme.accent.gradient)
                 .symbolEffect(.bounce, options: .nonRepeating)
+                .accessibilityHidden(true)
 
-            Text("Deck Complete")
-                .font(Theme.titleFont)
+            VStack(spacing: 4) {
+                Text("Deck Complete")
+                    .font(Theme.displayFont)
+                Text("You worked through all \(vm.totalCount) structures.")
+                    .font(Theme.bodyFont)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .multilineTextAlignment(.center)
+            .accessibilityElement(children: .combine)
 
-            Text("You studied \(vm.totalCount) structure\(vm.totalCount == 1 ? "" : "s").")
-                .font(Theme.bodyFont)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
+            HStack(spacing: 12) {
+                StatTile(label: "First Try", value: "\(vm.totalCount - vm.struggled.count)",
+                         icon: "checkmark.circle.fill", color: Theme.correct)
+                StatTile(label: "Studied Again", value: "\(vm.struggled.count)",
+                         icon: "arrow.uturn.backward.circle.fill", color: Theme.accent)
+            }
 
             if !vm.struggled.isEmpty {
                 Label {
-                    Text("\(vm.struggled.count) needed another look — they'll come up first next time you quiz.")
+                    Text("The ones you studied again come up first in your next quiz.")
                 } icon: {
-                    Image(systemName: "arrow.uturn.backward.circle.fill")
+                    Image(systemName: "sparkles")
                         .foregroundStyle(Theme.accent)
                 }
                 .font(Theme.bodyFont)
                 .foregroundStyle(Theme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
-                .background(Theme.bgCard, in: .rect(cornerRadius: 20))
+                .background(Theme.bgCard, in: .rect(cornerRadius: Theme.Metrics.cardRadius))
             }
         }
+    }
+}
+
+// MARK: - Card Flip
+
+/// One face of a card flipping over its horizontal axis: the front turns away as the back
+/// turns in from behind. Each face is only drawn while turned less than 90°, so the two
+/// read as one solid card.
+private struct CardFlip: Transition {
+    let isBack: Bool
+
+    func body(content: Content, phase: TransitionPhase) -> some View {
+        content.modifier(FlipRotation(angle: phase.isIdentity ? 0 : (isBack ? -180 : 180)))
+    }
+}
+
+private struct FlipRotation: ViewModifier, Animatable {
+    var angle: Double
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .rotation3DEffect(.degrees(angle), axis: (x: 1, y: 0, z: 0), perspective: 0.4)
+            .opacity(abs(angle) < 90 ? 1 : 0)
     }
 }
