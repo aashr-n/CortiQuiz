@@ -1,5 +1,12 @@
 # CortiQuiz — To Do
 
+## Menu redesign (2026-10-15) — needs you
+
+Details in `codenotes.md` → "Menu Redesign".
+
+1. **Feel it on a device.** The simulator can't tell you how the brain flick feels under a real finger (half a turn per screen width, settles in ~3 s; tune `Coordinator.settle`/`fastest` in `HeroBrainView.swift`), or what the clear glass tiles cost next to the 30 fps brain on an older iPhone.
+2. **Review and commit.** Nothing from the redesign is committed.
+
 ## UI refresh (2026-10-13) — needs you
 
 Details in `codenotes.md` → "UI Refresh".

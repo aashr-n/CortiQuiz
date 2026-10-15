@@ -103,7 +103,7 @@ struct ExploreView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.stage.ignoresSafeArea()
 
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading brain atlas…", failed: vm.loadFailed)
@@ -118,7 +118,7 @@ struct ExploreView: View {
                     Spacer()
                     if !vm.hasSelected {
                         Label("Tap any structure to name it", systemImage: "hand.tap.fill")
-                            .font(.subheadline.weight(.medium))
+                            .font(Theme.font(.subheadline))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
                             .glassEffect(.regular, in: .capsule)
@@ -156,7 +156,7 @@ struct ExploreView: View {
                                 .foregroundStyle(Theme.textPrimary)
                             if let region = s.hierarchyPath.last {
                                 Text(region.sentenceCased)
-                                    .font(.caption)
+                                    .font(Theme.font(.caption))
                                     .foregroundStyle(Theme.textSecondary)
                             }
                         }

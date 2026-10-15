@@ -136,7 +136,7 @@ struct QuizView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.stage.ignoresSafeArea()
 
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading quiz…", failed: vm.loadFailed)

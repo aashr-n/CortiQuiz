@@ -115,9 +115,9 @@ struct ScoreLabel: View {
 
     var body: some View {
         Label("\(score)/\(total)", systemImage: "star.fill")
-            .font(.subheadline.weight(.semibold))
+            .font(Theme.font(.subheadline).weight(.bold))
             .monospacedDigit()
-            .foregroundStyle(Theme.scoreGold)
+            .foregroundStyle(.primary)
             .contentTransition(.numericText())
             .animation(.snappy, value: score)
             .labelStyle(.titleAndIcon)
@@ -182,7 +182,7 @@ struct QuizPanel: View {
                         .transition(.scale(0.92).combined(with: .opacity))
                 } else {
                     Label(tip, systemImage: tipIcon)
-                        .font(.footnote)
+                        .font(Theme.font(.footnote))
                         .foregroundStyle(Theme.textTertiary)
                         .transition(.opacity)
                 }
@@ -203,11 +203,11 @@ struct QuizPanel: View {
                     .symbolEffect(.bounce, value: showingFeedback)
                 if answeredCorrectly, session.streak >= 3 {
                     Label("\(session.streak) in a row", systemImage: "flame.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.orange)
+                        .font(Theme.font(.footnote).weight(.bold))
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(.orange.opacity(0.16), in: .capsule)
+                        .background(.primary.opacity(0.08), in: .capsule)
                 }
             }
             if let detail {
@@ -227,6 +227,7 @@ struct QuizPanel: View {
                 Image(systemName: session.isFinished ? "flag.checkered" : "arrow.right")
             }
             .font(Theme.headingFont)
+            .foregroundStyle(Theme.onAccent)
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.glassProminent)
@@ -253,7 +254,7 @@ struct AnswerOptionsView: View {
                     } label: {
                         HStack {
                             Text(option.sentenceCased)
-                                .font(Theme.bodyFont.weight(.medium))
+                                .font(Theme.bodyFont)
                                 .multilineTextAlignment(.leading)
                             Spacer(minLength: 8)
                             feedbackIcon(for: option)
@@ -356,8 +357,8 @@ struct QuizResultsView: View {
                 .padding(.vertical, 4)
 
             HStack(spacing: 12) {
-                StatTile(label: "Score", value: "\(score) of \(total)", icon: "star.fill", color: Theme.scoreGold)
-                StatTile(label: "Best Streak", value: "\(bestStreak)", icon: "flame.fill", color: .orange)
+                StatTile(label: "Score", value: "\(score) of \(total)", icon: "star.fill", color: .secondary)
+                StatTile(label: "Best Streak", value: "\(bestStreak)", icon: "flame.fill", color: .secondary)
             }
 
             if missed.isEmpty {
@@ -370,7 +371,7 @@ struct QuizResultsView: View {
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Missed This Round")
-                        .font(.footnote.weight(.semibold))
+                        .font(Theme.font(.footnote).weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                         .textCase(.uppercase)
                     ForEach(missed, id: \.self) { name in

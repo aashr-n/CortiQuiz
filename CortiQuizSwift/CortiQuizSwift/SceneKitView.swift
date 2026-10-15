@@ -7,11 +7,12 @@ struct SceneKitView: UIViewRepresentable {
     /// Called with every hit under the tap, nearest first.
     var onTap: (([SCNHitTestResult]) -> Void)? = nil
     var recenterTrigger: Bool = false  // Toggle to trigger recenter
+    /// Black stage and glowing x-ray in dark mode; paper and pencil x-ray in light.
+    @Environment(\.colorScheme) private var colorScheme
     
     func makeUIView(context: Context) -> SCNView {
         let view = StageSCNView()
         view.autoenablesDefaultLighting = false
-        view.backgroundColor = .black
         view.antialiasingMode = .multisampling4X
         view.allowsCameraControl = allowsCameraControl
         
@@ -35,6 +36,7 @@ struct SceneKitView: UIViewRepresentable {
         let frame = Self.ensureSceneSetup(scene)
         view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
         view.defaultCameraController.target = frame.center
+        applyAppearance(to: view, context.coordinator)
         view.revealWhenPrepared(scene)
         context.coordinator.lastRecenter = recenterTrigger
         return view
@@ -46,7 +48,10 @@ struct SceneKitView: UIViewRepresentable {
             let frame = Self.ensureSceneSetup(scene)
             view.pointOfView = scene.rootNode.childNode(withName: "mainCamera", recursively: false)
             view.defaultCameraController.target = frame.center
+            applyAppearance(to: view, context.coordinator)
             view.revealWhenPrepared(scene)
+        } else {
+            applyAppearance(to: view, context.coordinator)
         }
         view.allowsCameraControl = allowsCameraControl
         
@@ -98,6 +103,17 @@ struct SceneKitView: UIViewRepresentable {
         return frame
     }
     
+    /// Background and x-ray look for the current color scheme, restyling the scene only when
+    /// the scheme (or the scene) changed.
+    private func applyAppearance(to view: SCNView, _ coordinator: Coordinator) {
+        let paper = colorScheme == .light
+        view.backgroundColor = SceneColors.stage.resolvedColor(with: UITraitCollection(userInterfaceStyle: paper ? .light : .dark))
+        guard coordinator.paperScene !== scene || coordinator.paper != paper else { return }
+        coordinator.paperScene = scene
+        coordinator.paper = paper
+        scene.rootNode.setStylePaper(paper)
+    }
+
     /// A glide from the current point of view back to where the camera starts out.
     private static func recenterGlide(in view: SCNView) -> CameraGlide? {
         guard let scene = view.scene, let camera = view.pointOfView else { return nil }
@@ -232,6 +248,9 @@ struct SceneKitView: UIViewRepresentable {
     class Coordinator: NSObject, UIGestureRecognizerDelegate {
         let onTap: (([SCNHitTestResult]) -> Void)?
         var lastRecenter: Bool = false
+        /// The scene last restyled by `applyAppearance`, and for which scheme.
+        var paperScene: SCNScene?
+        var paper = false
         init(onTap: (([SCNHitTestResult]) -> Void)?) { self.onTap = onTap }
 
         func recenter(_ view: SCNView) {
@@ -286,7 +305,7 @@ struct SceneKitView: UIViewRepresentable {
 /// Applies the camera's field of view to the view's narrower side. SceneKit measures it
 /// vertically by default, so in a view taller than it is wide (an iPad's side-by-side layout)
 /// the brain would spill off the sides.
-private final class StageSCNView: SCNView {
+final class StageSCNView: SCNView {
     override func layoutSubviews() {
         super.layoutSubviews()
         fitFieldOfViewToNarrowSide()

@@ -183,7 +183,7 @@ struct LearnView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.stage.ignoresSafeArea()
 
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading study deck…", failed: vm.loadFailed)
@@ -263,6 +263,7 @@ struct LearnView: View {
             Button { vm.reveal() } label: {
                 Text("Reveal")
                     .font(Theme.headingFont)
+                    .foregroundStyle(Theme.onAccent)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
@@ -278,8 +279,8 @@ struct LearnView: View {
                     .multilineTextAlignment(.center)
                 if card.hasPair {
                     Label("Both hemispheres", systemImage: "circle.lefthalf.filled")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(Theme.accent)
+                        .font(Theme.font(.caption))
+                        .foregroundStyle(Theme.textSecondary)
                 }
                 if !card.breadcrumb.isEmpty {
                     Text(card.breadcrumb)
@@ -303,10 +304,10 @@ struct LearnView: View {
                     Button { vm.markKnown() } label: {
                         Label("Got it", systemImage: "checkmark")
                             .font(Theme.headingFont)
+                            .foregroundStyle(Theme.onAccent)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassProminent)
-                    .tint(Theme.correct.mix(with: .black, by: 0.25))
                 }
                 .controlSize(.large)
             }
@@ -319,7 +320,7 @@ struct LearnView: View {
         SummarySheet(actionTitle: "Study Again", action: { vm.startSession() }, onDone: onDone) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 60))
-                .foregroundStyle(Theme.accent.gradient)
+                .foregroundStyle(.primary)
                 .symbolEffect(.bounce, options: .nonRepeating)
                 .accessibilityHidden(true)
 
@@ -335,9 +336,9 @@ struct LearnView: View {
 
             HStack(spacing: 12) {
                 StatTile(label: "First Try", value: "\(vm.totalCount - vm.struggled.count)",
-                         icon: "checkmark.circle.fill", color: Theme.correct)
+                         icon: "checkmark.circle.fill", color: .secondary)
                 StatTile(label: "Studied Again", value: "\(vm.struggled.count)",
-                         icon: "arrow.uturn.backward.circle.fill", color: Theme.accent)
+                         icon: "arrow.uturn.backward.circle.fill", color: .secondary)
             }
 
             if !vm.struggled.isEmpty {
@@ -345,7 +346,6 @@ struct LearnView: View {
                     Text("The ones you studied again come up first in your next quiz.")
                 } icon: {
                     Image(systemName: "sparkles")
-                        .foregroundStyle(Theme.accent)
                 }
                 .font(Theme.bodyFont)
                 .foregroundStyle(Theme.textSecondary)

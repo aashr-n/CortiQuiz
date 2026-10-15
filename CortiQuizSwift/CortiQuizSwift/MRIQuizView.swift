@@ -213,7 +213,7 @@ struct MRIQuizView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.stage.ignoresSafeArea()
 
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading MRI quiz…", failed: vm.loadFailed)
@@ -297,7 +297,7 @@ struct MRIQuizView: View {
         }
         .overlay(alignment: .topLeading) {
             Text("\(vm.activeAxis.title) · \(vm.activeAxis.locationLabel(vm.sliceCoord))")
-                .font(Theme.captionFont.weight(.medium))
+                .font(Theme.captionFont)
                 .monospacedDigit()
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.horizontal, 10)

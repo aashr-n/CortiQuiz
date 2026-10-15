@@ -39,19 +39,27 @@ nonisolated enum NodeStyle: Equatable {
 extension SCNNode {
     /// Lit by the scene's lights normally; with `xray` 1, replaced by a rim glow that is added
     /// to what's behind (the material blends additively and skips the depth buffer then).
+    /// On `paper` (light mode) the rim instead darkens what's behind, multiplied, so the
+    /// x-ray reads as pencil on paper rather than light on black.
     /// One program for both looks, so switching a structure's style never recompiles a shader.
     nonisolated private static let styleShaderSource = """
     #pragma arguments
     float xray;
     float rimGain;
     float glow;
+    float paper;
 
     #pragma body
     if (xray > 0.5) {
         float3 n = normalize(_surface.normal);
         float3 v = normalize(_surface.view);
         float rim = pow(1.0 - saturate(abs(dot(n, v))), 3.0);
-        _output.color = float4(_surface.diffuse.rgb * (0.002 + rim * rimGain), 1.0);
+        float amount = 0.002 + rim * rimGain;
+        if (paper > 0.5) {
+            _output.color = float4(1.0 - (1.0 - _surface.diffuse.rgb) * amount, 1.0);
+        } else {
+            _output.color = float4(_surface.diffuse.rgb * amount, 1.0);
+        }
     } else {
         _output.color.rgb += _surface.diffuse.rgb * glow;
     }
@@ -63,16 +71,18 @@ extension SCNNode {
             for mat in geom.materials {
                 if mat.shaderModifiers?[.fragment] != Self.styleShaderSource {
                     mat.shaderModifiers = [.fragment: Self.styleShaderSource]
-                    mat.setValue(NSNumber(value: Float(SceneColors.ghostRimGain)), forKey: "rimGain")
                     mat.setValue(NSNumber(value: Float(0)), forKey: "glow")
-                }
-                switch style {
-                case .solid(let color): mat.diffuse.contents = color
-                case .ghost: mat.diffuse.contents = SceneColors.ghost
+                    mat.setValue(NSNumber(value: Float(0)), forKey: "paper")
                 }
                 mat.isDoubleSided = true
-                mat.blendMode = isGhost ? .add : .alpha
                 mat.writesToDepthBuffer = !isGhost
+                switch style {
+                case .solid(let color):
+                    mat.diffuse.contents = color
+                    mat.blendMode = .alpha
+                case .ghost:
+                    Self.applyGhostLook(mat, paper: Self.isOnPaper(mat))
+                }
                 // A switch, not a value to fade: halfway through an implicit animation the
                 // shader would still be on the old branch with the new blending.
                 SCNTransaction.begin()
@@ -82,6 +92,29 @@ extension SCNNode {
             }
         }
         for child in childNodes { child.applyStyle(style) }
+    }
+
+    /// Restyle for the view's appearance: `paper` true in light mode. The 3D views call this
+    /// when their color scheme is set or changes; styles applied later keep to it.
+    nonisolated func setStylePaper(_ paper: Bool) {
+        for mat in geometry?.materials ?? [] where mat.shaderModifiers?[.fragment] == Self.styleShaderSource {
+            guard Self.isOnPaper(mat) != paper else { continue }
+            mat.setValue(NSNumber(value: Float(paper ? 1 : 0)), forKey: "paper")
+            if (mat.value(forKey: "xray") as? NSNumber)?.floatValue ?? 0 > 0.5 {
+                Self.applyGhostLook(mat, paper: paper)
+            }
+        }
+        for child in childNodes { child.setStylePaper(paper) }
+    }
+
+    nonisolated private static func isOnPaper(_ mat: SCNMaterial) -> Bool {
+        (mat.value(forKey: "paper") as? NSNumber)?.floatValue ?? 0 > 0.5
+    }
+
+    nonisolated private static func applyGhostLook(_ mat: SCNMaterial, paper: Bool) {
+        mat.diffuse.contents = paper ? SceneColors.ghostInk : SceneColors.ghost
+        mat.setValue(NSNumber(value: Float(paper ? SceneColors.ghostInkGain : SceneColors.ghostRimGain)), forKey: "rimGain")
+        mat.blendMode = paper ? .multiply : .add
     }
 }
 
@@ -140,16 +173,25 @@ func restyleNodes(
 
 extension SCNNode {
     /// The home screen's look: a dark, unlit surface whose silhouettes glow in `color`, so
-    /// every gyrus is outlined. `fill` (0…1) lifts the whole surface toward `color`.
+    /// every gyrus is outlined. `fill` (0…1) lifts the whole surface toward `color`. On
+    /// `paper` (light mode) it's the reverse: a paper-white surface outlined in a darker
+    /// `color`, like an ink drawing.
     nonisolated private static let glowShaderSource = """
     #pragma arguments
     float fill;
+    float paper;
 
     #pragma body
     float3 n = normalize(_surface.normal);
     float3 v = normalize(_surface.view);
     float rim = pow(1.0 - saturate(abs(dot(n, v))), 2.5);
-    _output.color = float4(_surface.diffuse.rgb * (fill + rim * 1.2), 1.0);
+    float amount = fill + rim * 1.2;
+    if (paper > 0.5) {
+        float3 ink = _surface.diffuse.rgb * \(SceneColors.heroInk);
+        _output.color = float4(mix(float3(\(SceneColors.paperWhite)), ink, saturate(amount * 1.5)), 1.0);
+    } else {
+        _output.color = float4(_surface.diffuse.rgb * amount, 1.0);
+    }
     """
 
     nonisolated func applyGlow(_ color: UIColor, fill: CGFloat) {
@@ -159,12 +201,21 @@ extension SCNNode {
                     mat.lightingModel = .constant
                     mat.isDoubleSided = false
                     mat.shaderModifiers = [.fragment: Self.glowShaderSource]
+                    mat.setValue(NSNumber(value: Float(0)), forKey: "paper")
                 }
                 mat.diffuse.contents = color
                 mat.setValue(NSNumber(value: Float(fill)), forKey: "fill")
             }
         }
         for child in childNodes { child.applyGlow(color, fill: fill) }
+    }
+
+    /// Light mode (`paper` true) or dark for the hero look.
+    nonisolated func setGlowPaper(_ paper: Bool) {
+        for mat in geometry?.materials ?? [] where mat.shaderModifiers?[.fragment] == Self.glowShaderSource {
+            mat.setValue(NSNumber(value: Float(paper ? 1 : 0)), forKey: "paper")
+        }
+        for child in childNodes { child.setGlowPaper(paper) }
     }
 }
 

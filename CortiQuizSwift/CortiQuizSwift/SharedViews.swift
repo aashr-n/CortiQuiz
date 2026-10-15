@@ -18,10 +18,10 @@ struct LoadingStateView: View {
             VStack(spacing: 16) {
                 Image(systemName: "brain")
                     .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(Theme.accent.gradient)
+                    .foregroundStyle(.secondary)
                     .symbolEffect(.breathe, options: .repeating)
                 Text(message)
-                    .font(.subheadline)
+                    .font(Theme.font(.subheadline))
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .ignore)
@@ -120,7 +120,7 @@ struct ExplodeSlider: View {
         } maximumValueLabel: {
             Image(systemName: "arrow.up.left.and.arrow.down.right")
         }
-        .font(.footnote.weight(.semibold))
+        .font(Theme.font(.footnote).weight(.bold))
         .foregroundStyle(.secondary)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -135,7 +135,7 @@ struct RecenterButton: View {
         Button(action: action) {
             Label("Recenter camera", systemImage: "scope")
                 .labelStyle(.iconOnly)
-                .font(.title3)
+                .font(Theme.font(.title3))
                 .frame(width: 30, height: 30)
         }
         .buttonStyle(.glass)
@@ -170,7 +170,7 @@ struct ClearButton: View {
         Button(action: action) {
             Label(label, systemImage: "xmark")
                 .labelStyle(.iconOnly)
-                .font(.footnote.weight(.bold))
+                .font(Theme.font(.footnote).weight(.bold))
                 .frame(width: 18, height: 18)
         }
         .buttonStyle(.glass)
@@ -254,13 +254,7 @@ struct ScoreRing: View {
                 .stroke(Theme.accent.opacity(0.2), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: shown)
-                .stroke(
-                    AngularGradient(colors: [Theme.accent.opacity(0.6), Theme.accent],
-                                    center: .center,
-                                    startAngle: .zero,
-                                    endAngle: .degrees(360 * max(shown, 0.001))),
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                )
+                .stroke(Theme.accent, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 0) {
                 Text("\(percent)%")
@@ -268,7 +262,7 @@ struct ScoreRing: View {
                     .monospacedDigit()
                     .contentTransition(.numericText(value: Double(percent)))
                 Text(caption)
-                    .font(.caption2)
+                    .font(Theme.font(.caption2))
                     .foregroundStyle(.secondary)
             }
         }
@@ -311,7 +305,8 @@ struct SummarySheet<Content: View>: View {
             .safeAreaBar(edge: .bottom) {
                 Button(action: action) {
                     Text(actionTitle)
-                        .font(.headline)
+                        .font(Theme.font(.headline))
+                        .foregroundStyle(Theme.onAccent)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)
@@ -329,7 +324,7 @@ struct SummarySheet<Content: View>: View {
     }
 }
 
-/// Rounded tile with a colored label over a big number, for session summaries.
+/// Rounded tile with a small label over a big number, for session summaries.
 struct StatTile: View {
     let label: String
     let value: String
@@ -339,7 +334,7 @@ struct StatTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label(label, systemImage: icon)
-                .font(.footnote.weight(.semibold))
+                .font(Theme.font(.footnote).weight(.bold))
                 .foregroundStyle(color)
             Text(value)
                 .font(Theme.numberFont(.title2))
@@ -390,8 +385,8 @@ private struct SessionSummaryModifier<Summary: View>: ViewModifier {
 
 // MARK: - Leaving a Mode
 
-/// Closes the open mode and returns to the menu. Modes are shown in a split view's detail
-/// column, where `dismiss` can't pop the root, so the menu provides this instead.
+/// Closes the open mode and returns to the menu, from anywhere inside the mode (a session
+/// summary sheet's Done, say). The menu provides it: it pops its navigation stack.
 struct LeaveModeAction: Equatable {
     fileprivate let action: () -> Void
 

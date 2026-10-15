@@ -227,8 +227,9 @@ private struct OrientationLabels: View {
 
     private func letter(_ text: String) -> some View {
         Text(text)
-            .font(.caption2.weight(.bold))
-            .foregroundColor(Theme.textSecondary)
+            .font(Theme.font(.caption2).weight(.bold))
+            // On the slice, which stays dark in light mode too.
+            .foregroundStyle(.white.opacity(0.6))
             .shadow(color: .black, radius: 2)
     }
 }
@@ -302,7 +303,7 @@ private struct ZoomableSlice<Key: Equatable>: View {
                 } label: {
                     Label("Reset zoom", systemImage: "arrow.down.right.and.arrow.up.left")
                         .labelStyle(.iconOnly)
-                        .font(.footnote.weight(.semibold))
+                        .font(Theme.font(.footnote).weight(.bold))
                         .frame(width: 18, height: 18)
                 }
                 .buttonStyle(.glass)
@@ -346,7 +347,7 @@ struct MRIView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.stage.ignoresSafeArea()
 
             if vm.isLoading || vm.loadFailed {
                 LoadingStateView(message: "Loading MRI data…", failed: vm.loadFailed)
@@ -407,7 +408,7 @@ struct MRIView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
                         Label("Tap a region to name it", systemImage: "hand.tap.fill")
-                            .font(Theme.bodyFont.weight(.medium))
+                            .font(Theme.bodyFont)
                         Text("Pinch to zoom, drag to pan")
                             .font(Theme.captionFont)
                             .foregroundStyle(Theme.textSecondary)
@@ -431,14 +432,14 @@ struct MRIView: View {
                 Text(axis.labelStart)
                 Spacer()
                 Text(axis.locationLabel(vm.sliceCoord))
-                    .font(Theme.captionFont.weight(.semibold))
+                    .font(Theme.captionFont.weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(Theme.textPrimary)
                     .contentTransition(.numericText())
                 Spacer()
                 Text(axis.labelEnd)
             }
-            .font(Theme.captionFont.weight(.medium))
+            .font(Theme.captionFont)
             .foregroundStyle(Theme.textSecondary)
             .padding(.horizontal, 6)
             .accessibilityHidden(true)
@@ -466,7 +467,7 @@ struct MRIView: View {
             vm.step(millimetres)
         } label: {
             Image(systemName: icon)
-                .font(.body.weight(.semibold))
+                .font(Theme.font(.body).weight(.bold))
                 .frame(width: 30, height: 30)
         }
         .buttonStyle(.glass)

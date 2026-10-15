@@ -23,21 +23,23 @@ final class CortiQuizSwiftUITests: XCTestCase {
     private func open(_ mode: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launch()
-        let card = menuRow(mode, in: app)
-        XCTAssertTrue(card.exists, "\(mode) card missing from menu")
-        card.tap()
+        let tile = menuTile(mode, in: app)
+        XCTAssertTrue(tile.exists, "\(mode) tile missing from menu")
+        tile.tap()
         return app
     }
 
-    /// A mode's row on the menu, scrolling down to it if the brain above pushed it off screen.
+    /// A mode's tile on the menu, scrolling down until it's wholly on screen if large text
+    /// pushed it off. (A tap on a tile cut off by the screen edge doesn't open it.)
     @MainActor
-    private func menuRow(_ mode: String, in app: XCUIApplication) -> XCUIElement {
-        let row = app.staticTexts[mode]
-        _ = app.staticTexts["Learn"].waitForExistence(timeout: 10)
-        for _ in 0..<4 where !(row.exists && row.isHittable) {
+    private func menuTile(_ mode: String, in app: XCUIApplication) -> XCUIElement {
+        let tile = app.buttons[mode]
+        _ = app.buttons["Learn"].waitForExistence(timeout: 10)
+        let screen = app.windows.firstMatch.frame
+        for _ in 0..<6 where !(tile.exists && tile.isHittable && screen.contains(tile.frame)) {
             app.swipeUp()
         }
-        return row
+        return tile
     }
 
     @MainActor
@@ -48,18 +50,19 @@ final class CortiQuizSwiftUITests: XCTestCase {
         add(attachment)
     }
 
+    /// At the default text size the whole menu fits on one screen: every tile is tappable
+    /// without scrolling.
     @MainActor
-    func testMainMenuListsEveryMode() throws {
+    func testMainMenuShowsEveryMode() throws {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.staticTexts["Learn"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Learn"].waitForExistence(timeout: 10))
         // Let the brain fade in before the screenshot.
         _ = app.staticTexts["no such element"].waitForExistence(timeout: 4)
         attachScreenshot(app, "Main menu")
         for mode in ["Learn", "3D Quiz", "MRI Quiz", "3D Atlas", "MRI Slicer"] {
-            XCTAssertTrue(menuRow(mode, in: app).exists, "\(mode) missing")
+            XCTAssertTrue(app.buttons[mode].isHittable, "\(mode) tile isn't on screen")
         }
-        attachScreenshot(app, "Main menu scrolled")
     }
 
     @MainActor
@@ -69,11 +72,12 @@ final class CortiQuizSwiftUITests: XCTestCase {
         // for this launch only (the argument domain shadows the app's own defaults).
         app.launchArguments += ["-cortiquiz.progress.v1", "none"]
         app.launch()
-        let start = app.buttons["Start Learning"]
-        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        let learn = app.buttons["Learn"]
+        XCTAssertTrue(learn.waitForExistence(timeout: 10))
+        XCTAssertEqual(learn.value as? String, "Start here")
         _ = app.staticTexts["no such element"].waitForExistence(timeout: 4)
         attachScreenshot(app, "First launch")
-        start.tap()
+        learn.tap()
         XCTAssertTrue(app.buttons["Reveal"].waitForExistence(timeout: loadTimeout))
     }
 
@@ -82,26 +86,36 @@ final class CortiQuizSwiftUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
         app.launch()
-        menuRow("3D Quiz", in: app).tap()
+        XCTAssertTrue(app.buttons["Learn"].waitForExistence(timeout: 10))
+        _ = app.staticTexts["no such element"].waitForExistence(timeout: 3)
+        attachScreenshot(app, "Main menu, large text")
+        menuTile("3D Quiz", in: app).tap()
         XCTAssertTrue(app.staticTexts["What structure is highlighted?"].waitForExistence(timeout: loadTimeout))
         _ = app.staticTexts["no such element"].waitForExistence(timeout: 1.5)
         attachScreenshot(app, "3D quiz, large text")
         XCTAssertEqual(app.buttons.matching(identifier: "answerOption").count, 4)
     }
 
-    /// iPad: the menu is a sidebar beside the open mode, and modes lay out side by side in
-    /// landscape and stacked in portrait.
+    /// iPad: the menu puts its tiles under the brain in portrait and beside it in landscape,
+    /// and modes lay out stacked in portrait and side by side in landscape.
     @MainActor
     func testIPadLayouts() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .pad, "iPad only")
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launch()
-        // The menu shows at launch even in portrait.
-        let quiz = app.staticTexts["3D Quiz"]
+        let quiz = app.buttons["3D Quiz"]
         XCTAssertTrue(quiz.waitForExistence(timeout: 10))
         _ = app.staticTexts["no such element"].waitForExistence(timeout: 4)
         attachScreenshot(app, "iPad menu portrait")
+        XCTAssertGreaterThan(quiz.frame.minY, app.windows.firstMatch.frame.midY)
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        _ = app.staticTexts["no such element"].waitForExistence(timeout: 3)
+        attachScreen("iPad menu landscape")
+        XCTAssertGreaterThan(quiz.frame.minX, app.windows.firstMatch.frame.midX)
+        XCUIDevice.shared.orientation = .portrait
+        _ = app.staticTexts["no such element"].waitForExistence(timeout: 2)
 
         quiz.tap()
         XCTAssertTrue(app.staticTexts["What structure is highlighted?"].waitForExistence(timeout: loadTimeout))
@@ -191,7 +205,7 @@ final class CortiQuizSwiftUITests: XCTestCase {
         attachScreenshot(app, "3D quiz summary")
 
         app.buttons["Done"].tap()
-        XCTAssertTrue(app.staticTexts["Learn"].waitForExistence(timeout: 5), "Done should return to the menu")
+        XCTAssertTrue(app.buttons["Learn"].waitForExistence(timeout: 5), "Done should return to the menu")
     }
 
     @MainActor

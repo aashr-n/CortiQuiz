@@ -5,31 +5,60 @@ import SwiftUI
 enum Theme {
     // MARK: Backgrounds — system grouped colors, so cards match native lists and sheets.
     static let bgCard = Color(uiColor: .secondarySystemGroupedBackground)
-    static let bgCardStroke = Color.white.opacity(0.09)
+    static let bgCardStroke = Color.primary.opacity(0.1)
+    /// Behind every screen and the 3D stage: black in dark mode, off-white paper in light.
+    static let stage = Color(uiColor: SceneColors.stage)
 
-    // MARK: Accent — dusty brain-pink (also the asset catalog's AccentColor)
-    static let accent = Color(red: 0.83, green: 0.51, blue: 0.60)       // #D4829A
+    // MARK: Accent — ink, not a hue: the brain is the only thing in color. Near-white on
+    // dark, near-black on light (also the asset catalog's AccentColor).
+    static let accent = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(white: 0.93, alpha: 1) : UIColor(white: 0.10, alpha: 1) })
+    /// Text and icons on an `accent` fill (prominent buttons).
+    static let onAccent = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .black : .white })
 
     // MARK: Text — system label colors
     static let textPrimary = Color.primary
     static let textSecondary = Color.secondary
     static let textTertiary = Color(uiColor: .tertiaryLabel)
 
-    // MARK: Feedback
+    // MARK: Feedback — the one place besides the brain that keeps color: right and wrong.
     static let correct = Color(red: 0.30, green: 0.85, blue: 0.45)
     static let incorrect = Color(red: 0.90, green: 0.30, blue: 0.30)
-    static let scoreGold = Color(red: 0.95, green: 0.77, blue: 0.20)
 
-    // MARK: Typography — New York serif for brand moments (titles, the answer on a
-    // flashcard), SF Pro everywhere else, SF Rounded for numbers. Built on text styles so
-    // they scale with Dynamic Type / accessibility text sizes.
-    static let displayFont: Font = .system(.largeTitle, design: .serif).weight(.bold)
-    static let titleFont: Font = .system(.title2, design: .serif).weight(.semibold)
-    static let headingFont: Font = .headline
-    static let bodyFont: Font = .subheadline
-    static let captionFont: Font = .caption
+    // MARK: Typography — Times New Roman throughout, for a textbook feel. Built on text
+    // styles so it scales with Dynamic Type / accessibility text sizes.
+    static let fontName = "Times New Roman"
+    static let displayFont: Font = font(.largeTitle).weight(.bold)
+    static let titleFont: Font = font(.title2).weight(.bold)
+    static let headingFont: Font = font(.headline)
+    static let bodyFont: Font = font(.subheadline)
+    static let captionFont: Font = font(.caption)
     static func numberFont(_ style: Font.TextStyle) -> Font {
-        .system(style, design: .rounded).weight(.bold)
+        font(style).weight(.bold)
+    }
+
+    /// Times New Roman at `style`'s size. Times sets small next to SF at the same point
+    /// size, so it runs a little larger; `.headline` is bold, as the system's is heavy.
+    static func font(_ style: Font.TextStyle) -> Font {
+        let base = Font.custom(fontName, size: pointSize(style), relativeTo: style)
+        return style == .headline ? base.weight(.bold) : base
+    }
+
+    private static func pointSize(_ style: Font.TextStyle) -> CGFloat {
+        let size: CGFloat = switch style {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .headline, .body: 17
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        default: 17
+        }
+        return (size * 1.12).rounded()
     }
 
     // MARK: Layout
@@ -42,16 +71,30 @@ enum Theme {
         static let cardRadius: CGFloat = 22
     }
 
-    /// Navigation bar titles in New York, matching `titleFont`. Applied once at launch.
-    static func applyNavigationBarFonts() {
-        func serif(_ style: UIFont.TextStyle, _ weight: UIFont.Weight) -> UIFont {
-            let system = UIFont.systemFont(ofSize: UIFont.preferredFont(forTextStyle: style).pointSize, weight: weight)
-            guard let descriptor = system.fontDescriptor.withDesign(.serif) else { return system }
-            return UIFont(descriptor: descriptor, size: 0)
+    /// Times New Roman in the UIKit-drawn text SwiftUI's font doesn't reach: navigation bar
+    /// titles and subtitles, bar buttons, the search field, and segmented pickers. Applied once at launch.
+    static func applyUIKitFonts() {
+        func times(_ style: UIFont.TextStyle, bold: Bool) -> UIFont {
+            let size = UIFont.preferredFont(forTextStyle: style).pointSize * 1.12
+            let name = bold ? "TimesNewRomanPS-BoldMT" : "TimesNewRomanPSMT"
+            return UIFont(name: name, size: size) ?? .preferredFont(forTextStyle: style)
         }
-        let bar = UINavigationBar.appearance()
-        bar.largeTitleTextAttributes = [.font: serif(.largeTitle, .bold)]
-        bar.titleTextAttributes = [.font: serif(.headline, .semibold)]
+        // Only `standardAppearance`: without a scroll-edge appearance of its own, the bar
+        // keeps going transparent at the scroll edge.
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithDefaultBackground()
+        appearance.largeTitleTextAttributes = [.font: times(.largeTitle, bold: true)]
+        appearance.titleTextAttributes = [.font: times(.headline, bold: true)]
+        appearance.subtitleTextAttributes = [.font: times(.caption1, bold: false)]
+        appearance.largeSubtitleTextAttributes = [.font: times(.subheadline, bold: false)]
+        UINavigationBar.appearance().standardAppearance = appearance
+        for state: UIControl.State in [.normal, .highlighted, .disabled] {
+            UIBarButtonItem.appearance().setTitleTextAttributes([.font: times(.body, bold: false)], for: state)
+        }
+        UITextField.appearance(whenContainedInInstancesOf: [UISearchBar.self]).font = times(.body, bold: false)
+        let segmented = UISegmentedControl.appearance()
+        segmented.setTitleTextAttributes([.font: times(.subheadline, bold: false)], for: .normal)
+        segmented.setTitleTextAttributes([.font: times(.subheadline, bold: true)], for: .selected)
     }
 
     // MARK: Haptics
@@ -81,7 +124,7 @@ nonisolated enum SceneColors {
     static let ghostRimGain: CGFloat = 0.10
     /// Structure the user is asked to identify.
     static let target = UIColor(red: 0.96, green: 0.24, blue: 0.36, alpha: 1.0)
-    /// Learn mode: highlight once the answer is revealed (Theme.accent).
+    /// Learn mode: highlight once the answer is revealed (the hero brain's pink).
     static let revealed = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 1.0)
     /// Explore mode: the tapped / searched structure.
     static let selection = UIColor(red: 0.30, green: 0.85, blue: 0.45, alpha: 1.0)
@@ -90,16 +133,22 @@ nonisolated enum SceneColors {
     /// The other hemisphere of a correctly answered left/right pair.
     static let pairedCorrect = UIColor(red: 0.25, green: 0.55, blue: 0.95, alpha: 1.0)
 
+    /// Behind every screen and 3D view (`Theme.stage`): black, or off-white paper in light mode.
+    static let stage = UIColor { $0.userInterfaceStyle == .dark ? .black : UIColor(white: paperWhite, alpha: 1) }
+    static let paperWhite: CGFloat = 0.965
+    /// Light mode's x-ray: silhouettes darken the paper (multiplied) instead of glowing.
+    static let ghostInk = UIColor(red: 0.30, green: 0.34, blue: 0.42, alpha: 1.0)
+    static let ghostInkGain: CGFloat = 0.16
+
     // Home screen hero brain (`SCNNode.applyGlow`)
-    static let heroGlow = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 1.0)      // Theme.accent
+    static let heroGlow = UIColor(red: 0.83, green: 0.51, blue: 0.60, alpha: 1.0)      // dusty brain-pink
     static let heroLearning = UIColor(red: 0.95, green: 0.66, blue: 0.74, alpha: 1.0)
     static let heroMastered = UIColor(red: 1.00, green: 0.84, blue: 0.62, alpha: 1.0)
     static let heroFill: CGFloat = 0.06
     static let heroLearningFill: CGFloat = 0.22
     static let heroMasteredFill: CGFloat = 0.42
-    /// Behind the 3D stage: near-black, a touch lighter in the middle for depth.
-    static let stageCenter = UIColor(red: 0.075, green: 0.075, blue: 0.09, alpha: 1.0)
-    static let stageEdge = UIColor(white: 0.0, alpha: 1.0)
+    /// Light mode: the hero colors are drawn as ink on paper, darkened by this much.
+    static let heroInk: CGFloat = 0.6
 
     // MRI modes
     /// Mini-brain slice plane: where it's in front of the brain, and (fainter) through it.

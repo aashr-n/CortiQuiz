@@ -4,6 +4,7 @@ import SwiftUI
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingReset = false
+    @AppStorage(Appearance.storageKey) private var appearance = Appearance.system
     private let store = ProgressStore.shared
 
     private var version: String {
@@ -27,7 +28,7 @@ struct AboutView: View {
                         Text("CortiQuiz")
                             .font(Theme.displayFont)
                         Text(version)
-                            .font(.footnote)
+                            .font(Theme.font(.footnote))
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -36,7 +37,7 @@ struct AboutView: View {
 
                 Section("Anatomy") {
                     Text("Every structure comes from the SPL-PNL Brain Atlas: 3D models segmented from the MRI of a healthy volunteer by the Surgical Planning Lab and the Psychiatry Neuroimaging Lab at Brigham and Women's Hospital.")
-                        .font(.subheadline)
+                        .font(Theme.font(.subheadline))
                         .foregroundStyle(Theme.textSecondary)
                     Link(destination: URL(string: "http://www.spl.harvard.edu/publications/item/view/1265")!) {
                         Label("Cite the Atlas", systemImage: "quote.opening")
@@ -55,6 +56,14 @@ struct AboutView: View {
                     Text("Progress")
                 } footer: {
                     Text("Resetting clears your quiz history, best streak, and review list.")
+                }
+
+                Section("Appearance") {
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(Appearance.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
             }
             .navigationTitle("About")

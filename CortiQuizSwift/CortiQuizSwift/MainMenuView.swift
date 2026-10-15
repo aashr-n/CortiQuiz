@@ -7,10 +7,6 @@ enum AppMode: String, CaseIterable, Identifiable, Hashable {
 
     var id: Self { self }
 
-    /// Menu sections: test yourself, or look around.
-    static let practice: [AppMode] = [.learn, .quiz, .mriQuiz]
-    static let reference: [AppMode] = [.explore, .mri]
-
     var icon: String {
         switch self {
         case .learn: return "rectangle.portrait.on.rectangle.portrait.angled.fill"
@@ -18,17 +14,6 @@ enum AppMode: String, CaseIterable, Identifiable, Hashable {
         case .mriQuiz: return "square.3.layers.3d.middle.filled"
         case .explore: return "cube.transparent.fill"
         case .mri: return "slider.horizontal.below.square.filled.and.square"
-        }
-    }
-
-    /// Icon tile color on the menu.
-    var color: Color {
-        switch self {
-        case .learn: return .orange
-        case .quiz: return Theme.accent
-        case .mriQuiz: return .purple
-        case .explore: return .teal
-        case .mri: return .indigo
         }
     }
 
@@ -42,13 +27,14 @@ enum AppMode: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// The line under the title on the menu, short enough for a half-width tile.
     var subtitle: String {
         switch self {
         case .learn: return "Flashcards at your own pace"
-        case .quiz: return "Name the highlighted structure"
-        case .mriQuiz: return "Name structures on brain slices"
-        case .explore: return "Browse every structure in 3D"
-        case .mri: return "Scroll through cross-sections"
+        case .quiz: return "Name structures in 3D"
+        case .mriQuiz: return "Name them on slices"
+        case .explore: return "Every structure in 3D"
+        case .mri: return "Scroll through slices"
         }
     }
 
@@ -66,62 +52,24 @@ enum AppMode: String, CaseIterable, Identifiable, Hashable {
 
 // MARK: - Main Menu
 
-/// The menu: a sidebar beside the open mode on iPad, a navigation stack on iPhone.
-///
-/// iPhone doesn't use a collapsed split view: its push made the main thread wait on a
-/// lower-priority thread at the start of every transition (a priority inversion the UI tests
-/// flagged on each mode open), which a plain stack doesn't. iPad keeps the split view, which
-/// also keeps the open mode when a window crosses between compact and regular widths.
+/// The menu: the turning brain, your progress under it, and a glass tile for each mode.
+/// A mode pushes over the whole screen, on iPhone and iPad alike.
 struct MainMenuView: View {
-    /// iPad: the mode in the detail column.
-    @State private var selection: AppMode?
-    /// iPhone: the pushed mode.
     @State private var path: [AppMode] = []
     @State private var showingAbout = false
-    /// Starts with the menu showing, even in iPad portrait where a split view would hide it
-    /// behind the detail's "Choose a mode".
-    @State private var columnVisibility = NavigationSplitViewVisibility.all
-    @Environment(\.horizontalSizeClass) private var sizeClass
-
-    private let usesSplitView = UIDevice.current.userInterfaceIdiom == .pad
 
     var body: some View {
-        Group {
-            if usesSplitView {
-                NavigationSplitView(columnVisibility: $columnVisibility) {
-                    // A narrow window collapses to the list alone; the brain moves into it.
-                    MenuList(selection: $selection, showsHero: sizeClass == .compact,
-                             heroIsActive: selection == nil, open: open, onAbout: { showingAbout = true })
-                } detail: {
-                    if let mode = selection {
-                        NavigationStack { ModeScreen(mode: mode) }
-                            .id(mode)
-                    } else {
-                        MenuPlaceholder(mastery: ProgressStore.shared.masteryByName)
-                    }
-                }
-                // Once a mode is open, let the system decide (iPad portrait gives the mode
-                // the whole screen); back on the menu, show it again.
-                .onChange(of: selection) { columnVisibility = selection == nil ? .all : .automatic }
-                .environment(\.leaveMode, LeaveModeAction { selection = nil })
-            } else {
-                NavigationStack(path: $path) {
-                    MenuList(selection: nil, showsHero: true, heroIsActive: path.isEmpty, open: open, onAbout: { showingAbout = true })
-                        .navigationDestination(for: AppMode.self) { ModeScreen(mode: $0) }
-                }
-                .environment(\.leaveMode, LeaveModeAction { path.removeAll() })
-            }
+        NavigationStack(path: $path) {
+            MenuScreen(isActive: path.isEmpty, open: { path = [$0] }, onAbout: { showingAbout = true })
+                .navigationDestination(for: AppMode.self) { ModeScreen(mode: $0) }
         }
+        .environment(\.leaveMode, LeaveModeAction { path.removeAll() })
         .sheet(isPresented: $showingAbout) { AboutView() }
         .tint(Theme.accent)
     }
-
-    private func open(_ mode: AppMode) {
-        if usesSplitView { selection = mode } else { path = [mode] }
-    }
 }
 
-/// A mode with its title, as pushed or shown in the detail column.
+/// A mode with its title, as pushed from the menu.
 private struct ModeScreen: View {
     let mode: AppMode
 
@@ -132,206 +80,354 @@ private struct ModeScreen: View {
     }
 }
 
-/// The menu's list: the hero brain (iPhone), progress or Start Here, and the modes.
-private struct MenuList: View {
-    /// The split view's selection on iPad; nil on iPhone, where rows push onto the stack.
-    let selection: Binding<AppMode?>?
-    let showsHero: Bool
-    var heroIsActive = true
+/// The menu's one screen, with no navigation bar. Portrait: the wordmark, the brain, then the
+/// progress and tiles under it. Wide (iPad landscape): a spread, the brain the full height
+/// of the left and the wordmark heading a column of progress and tiles on the right. The
+/// brain takes whatever room the rest leaves; at large text sizes the whole screen scrolls.
+private struct MenuScreen: View {
+    /// False while a mode is open over the menu, so the brain stops drawing.
+    let isActive: Bool
     let open: (AppMode) -> Void
     let onAbout: () -> Void
 
+    @State private var appeared = false
     private let store = ProgressStore.shared
 
     var body: some View {
-        Group {
-            if let selection {
-                List(selection: selection) { sections }
-            } else {
-                List { sections }
-            }
-        }
-        .scrollContentBackground(.hidden)
-        .background { MenuBackground() }
-        .navigationTitle("CortiQuiz")
-        .navigationSubtitle("Brain Anatomy Trainer")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("About", systemImage: "info.circle", action: onAbout)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var sections: some View {
-        // On iPad the brain gets the whole detail column until a mode is picked.
-        if showsHero {
-            Section {
-                HeroBrainView(mastery: store.masteryByName, isActive: heroIsActive)
-                    .frame(height: 220)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-            }
-            .listSectionSpacing(4)
-        }
-
-        Section {
-            if store.totalAnswered > 0 {
-                ProgressSummary(store: store)
-            } else {
-                WelcomeRow { open(.learn) }
-            }
-        } footer: {
-            if store.totalAnswered > 0 {
-                Text("Structures you've mastered in the quizzes glow gold on the brain.")
-            }
-        }
-
-        Section("Practice") {
-            ForEach(AppMode.practice) { ModeRow(mode: $0) }
-        }
-
-        Section("Explore") {
-            ForEach(AppMode.reference) { ModeRow(mode: $0) }
-        }
-    }
-}
-
-/// Grouped background with a faint wash of the accent behind the title and the brain.
-private struct MenuBackground: View {
-    var body: some View {
-        ZStack(alignment: .top) {
-            Color(uiColor: .systemGroupedBackground)
-            RadialGradient(
-                colors: [Theme.accent.opacity(0.30), Theme.accent.opacity(0)],
-                center: UnitPoint(x: 0.5, y: 0.12),
-                startRadius: 0,
-                endRadius: 380
-            )
-            .frame(height: 520)
-        }
-        .ignoresSafeArea()
-    }
-}
-
-/// iPad, before a mode is open: the brain, large.
-private struct MenuPlaceholder: View {
-    let mastery: [String: ProgressStore.Mastery]
-
-    var body: some View {
-        ZStack {
-            MenuBackground()
-            VStack(spacing: 8) {
-                HeroBrainView(mastery: mastery)
-                    .frame(maxWidth: 720, maxHeight: 460)
-                Text("CortiQuiz")
-                    .font(Theme.displayFont)
-                Text("Choose a mode to start studying.")
-                    .font(.title3)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            .padding(40)
-        }
-    }
-}
-
-// MARK: - Rows
-
-private struct ModeRow: View {
-    let mode: AppMode
-
-    var body: some View {
-        NavigationLink(value: mode) {
-            HStack(spacing: 14) {
-                ModeIcon(mode: mode)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(mode.title)
-                        .font(.body.weight(.semibold))
-                    Text(mode.subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+        GeometryReader { geo in
+            let wide = geo.size.width > geo.size.height && geo.size.width >= 700
+            // `AnyLayout` keeps the brain's identity when an iPad rotates, so its scene
+            // isn't rebuilt.
+            let layout = wide ? AnyLayout(HStackLayout(spacing: 40)) : AnyLayout(VStackLayout(spacing: 12))
+            ScrollView {
+                layout {
+                    if !wide { wordmark }
+                    HeroBrainView(mastery: store.masteryByName, isActive: isActive)
+                        .frame(minHeight: 220, maxHeight: .infinity)
+                    VStack(spacing: 32) {
+                        if wide { wordmark }
+                        panel
+                    }
+                    .frame(maxWidth: wide ? 440 : 560)
                 }
-                .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .frame(minHeight: geo.size.height)
             }
-            .padding(.vertical, 6)
+            .scrollBounceBehavior(.basedOnSize)
+            .background(Theme.stage)
+        }
+        .overlay(alignment: .topTrailing) {
+            AboutButton(action: onAbout)
+                .padding(.trailing, 16)
+                .padding(.top, 10)
+                .entrance(appeared, order: 0)
+        }
+        .navigationTitle("CortiQuiz")
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .onAppear { appeared = true }
+    }
+
+    private var wordmark: some View {
+        Wordmark()
+            .padding(.top, 4)
+            .entrance(appeared, order: 0)
+    }
+
+    private var panel: some View {
+        VStack(spacing: 20) {
+            Group {
+                if store.totalAnswered > 0 {
+                    ProgressStrip(store: store)
+                } else {
+                    WelcomeNote()
+                }
+            }
+            .entrance(appeared, order: 1)
+
+            ModeGrid(startHere: store.totalAnswered == 0, reviewCount: store.reviewQueue.count,
+                     appeared: appeared, open: open)
         }
     }
 }
 
-/// Settings-style rounded tile with the mode's symbol.
-private struct ModeIcon: View {
-    let mode: AppMode
+// MARK: - Header
 
+/// "Corti*Quiz*" in Times over a tracked tagline. A logo, so like a navigation bar it stops
+/// growing at the largest standard text size.
+private struct Wordmark: View {
     var body: some View {
-        Image(systemName: mode.icon)
-            .font(.system(size: 19, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 42, height: 42)
-            .background(mode.color.gradient, in: .rect(cornerRadius: 11, style: .continuous))
-            .accessibilityHidden(true)
-    }
-}
-
-/// First launch: what the app is for, and where to begin.
-private struct WelcomeRow: View {
-    let onStart: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Start Here")
-                    .font(.headline)
-                Text("Learn each structure with flashcards, then name them in 3D and on MRI slices. Everything you master lights up on the brain.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Button(action: onStart) {
-                Label("Start Learning", systemImage: "rectangle.portrait.on.rectangle.portrait.angled.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.large)
+        VStack(spacing: 3) {
+            Text("\(Text("Corti"))\(Text("Quiz").italic())")
+                .font(Theme.displayFont)
+            Text("Brain Anatomy Trainer")
+                .eyebrow(tracking: 2.2)
         }
-        .padding(.vertical, 8)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        // Clear of the About button on both sides, so it stays centered.
+        .padding(.horizontal, 52)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("CortiQuiz, Brain Anatomy Trainer")
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
-/// Lifetime accuracy ring plus totals.
-private struct ProgressSummary: View {
+/// A glass circle in the top corner, floating over the menu.
+private struct AboutButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("About", systemImage: "info")
+                .labelStyle(.iconOnly)
+                .font(Theme.font(.body).weight(.bold))
+                .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .tint(.primary)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityShowsLargeContentViewer()
+    }
+}
+
+// MARK: - Progress
+
+/// Lifetime numbers in a row, or two by two when they don't fit (large text). Learning and
+/// Mastered carry the brain's two highlight colors, so the numbers double as its legend.
+private struct ProgressStrip: View {
     let store: ProgressStore
 
     var body: some View {
-        HStack(spacing: 20) {
-            ScoreRing(fraction: store.accuracy, caption: "accuracy")
-                .frame(width: 92, height: 92)
-
-            VStack(alignment: .leading, spacing: 7) {
-                Text("Your Progress")
-                    .font(.headline)
-                stat("\(store.totalAnswered) answered", icon: "checkmark.circle.fill", color: Theme.correct)
-                stat("\(store.masteredCount) mastered", icon: "star.circle.fill", color: Color(SceneColors.heroMastered))
-                stat("Best streak \(store.bestStreak)", icon: "flame.fill", color: .orange)
-                if !store.reviewQueue.isEmpty {
-                    stat("\(store.reviewQueue.count) to review", icon: "arrow.uturn.backward.circle.fill", color: Theme.accent)
-                }
+        let mastered = store.masteredCount
+        let accuracy = StatColumn(value: "\(Int((store.accuracy * 100).rounded()))%", label: "Accuracy")
+        let learning = StatColumn(value: "\(store.masteryByName.count - mastered)", label: "Learning",
+                                  dot: Color(SceneColors.heroLearning))
+        let mastery = StatColumn(value: "\(mastered)", label: "Mastered", dot: Color(SceneColors.heroMastered))
+        let streak = StatColumn(value: "\(store.bestStreak)", label: "Best Streak")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 0) {
+                accuracy
+                divider
+                learning
+                divider
+                mastery
+                divider
+                streak
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Grid(verticalSpacing: 14) {
+                GridRow { accuracy; learning }
+                GridRow { mastery; streak }
+            }
         }
-        .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
     }
 
-    private func stat(_ text: String, icon: String, color: Color) -> some View {
-        Label {
-            Text(text)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private var divider: some View {
+        Rectangle()
+            .fill(.primary.opacity(0.12))
+            .frame(width: 1, height: 22)
+    }
+}
+
+private struct StatColumn: View {
+    let value: String
+    let label: String
+    var dot: Color?
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(Theme.font(.title2).weight(.bold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
-        } icon: {
-            Image(systemName: icon)
-                .foregroundStyle(color)
+            HStack(spacing: 5) {
+                if let dot {
+                    Circle()
+                        .fill(dot)
+                        .frame(width: 6, height: 6)
+                }
+                Text(label)
+                    .eyebrow(tracking: 0.6)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// First launch: what the app is for, in place of the numbers.
+private struct WelcomeNote: View {
+    var body: some View {
+        Text("Learn each structure with flashcards, then name it in 3D and on MRI slices. Everything you master lights up on the brain.")
+            .font(Theme.font(.subheadline))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 340)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+// MARK: - Mode Tiles
+
+/// The modes as glass tiles: Learn across the top, then the quizzes, then the reference
+/// tools, with 3D on the left and MRI on the right.
+private struct ModeGrid: View {
+    let startHere: Bool
+    let reviewCount: Int
+    let appeared: Bool
+    let open: (AppMode) -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private let gap: CGFloat = 10
+
+    var body: some View {
+        // At accessibility text sizes the pairs stack, one tile per row.
+        let pair = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: gap)) : AnyLayout(HStackLayout(spacing: gap))
+        let review = reviewCount > 0 ? "\(reviewCount) to review" : nil
+
+        GlassEffectContainer(spacing: gap) {
+            VStack(spacing: gap) {
+                ModeTile(mode: .learn, banner: true, note: startHere ? "Start here" : nil,
+                         highlighted: startHere, open: open)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .entrance(appeared, order: 2)
+                pair {
+                    ModeTile(mode: .quiz, note: review, open: open)
+                    ModeTile(mode: .mriQuiz, note: review, open: open)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .entrance(appeared, order: 3)
+                pair {
+                    ModeTile(mode: .explore, open: open)
+                    ModeTile(mode: .mri, open: open)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .entrance(appeared, order: 4)
+            }
+        }
+    }
+}
+
+private struct ModeTile: View {
+    let mode: AppMode
+    /// Full width, with the words beside the icon instead of under it.
+    var banner = false
+    /// In the top corner: "Start here", or how many flagged structures the quiz asks first.
+    var note: String?
+    /// The tile to start with: drawn with a heavier outline.
+    var highlighted = false
+    let open: (AppMode) -> Void
+
+    static let cornerRadius: CGFloat = 26
+
+    var body: some View {
+        Button { open(mode) } label: {
+            Group {
+                if banner {
+                    HStack(spacing: 14) {
+                        icon
+                        words
+                        Spacer(minLength: 8)
+                        noteText
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(alignment: .firstTextBaseline) {
+                            icon
+                            Spacer(minLength: 8)
+                            noteText
+                        }
+                        Spacer(minLength: 14)
+                        words
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(.rect(cornerRadius: Self.cornerRadius))
+        }
+        .buttonStyle(GlassTileStyle(emphasized: highlighted, cornerRadius: Self.cornerRadius))
+        .accessibilityLabel(mode.title)
+        .accessibilityValue(note ?? "")
+        .accessibilityHint(mode.subtitle)
+    }
+
+    private var icon: some View {
+        Image(systemName: mode.icon)
+            .font(Theme.font(.title2))
+            .foregroundStyle(.primary)
+            .frame(minWidth: 30, alignment: .leading)
+    }
+
+    private var words: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(mode.title)
+                .font(Theme.font(.title3).weight(.bold))
+                .foregroundStyle(.primary)
+            Text(mode.subtitle)
+                .font(Theme.font(.footnote))
+                .foregroundStyle(.secondary)
+        }
+        .multilineTextAlignment(.leading)
+    }
+
+    @ViewBuilder private var noteText: some View {
+        if let note {
+            Text(note)
+                .font(Theme.font(.caption).italic())
+                .foregroundStyle(.primary)
+        }
+    }
+}
+
+/// A button drawn as a Liquid Glass slab that answers touch, with a hairline edge so it
+/// holds its shape on the plain backdrop.
+private struct GlassTileStyle: ButtonStyle {
+    var emphasized = false
+    var cornerRadius: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        configuration.label
+            .glassEffect(.regular.interactive(), in: shape)
+            .overlay(shape.strokeBorder(.primary.opacity(emphasized ? 0.45 : 0.1), lineWidth: emphasized ? 1 : 0.5))
+    }
+}
+
+// MARK: - Details
+
+private extension Text {
+    /// Small tracked capitals, for labels above or under content.
+    func eyebrow(tracking: CGFloat = 1) -> some View {
+        font(Theme.font(.caption2).weight(.bold))
+            .tracking(tracking)
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+    }
+}
+
+private extension View {
+    /// Fades and rises into place when the menu first appears, `order` steps after the first.
+    func entrance(_ shown: Bool, order: Int) -> some View {
+        modifier(Entrance(shown: shown, order: order))
+    }
+}
+
+private struct Entrance: ViewModifier {
+    let shown: Bool
+    let order: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 18)
+            .animation(.spring(duration: 0.7, bounce: 0.2).delay(0.07 * Double(order)), value: shown)
     }
 }
